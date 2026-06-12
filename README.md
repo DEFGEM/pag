@@ -4,7 +4,7 @@ Resumen
 -------
 Este repositorio contiene una aplicación web frontend construida con React + TypeScript y Vite. Utiliza Tailwind CSS con el tema shadcn y una colección de componentes UI listos para usar.
 
-Stack
+Tecnologías
 -----
 - Node.js 20
 - React 19
