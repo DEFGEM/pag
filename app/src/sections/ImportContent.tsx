@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useStore } from '@/hooks/useStore';
 import { Upload, FileText, X, Loader2, BookOpen, CheckCircle2, Sparkles } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
-import type { Difficulty } from '@/types';
+import type { Difficulty, Module, Lesson } from '@/types';
 
 export default function ImportContent() {
   const { state, dispatch, addNotification } = useStore();
@@ -13,7 +13,12 @@ export default function ImportContent() {
   const [lessonCount, setLessonCount] = useState([8]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
-  const [generatedModule, setGeneratedModule] = useState<any>(null);
+  const [generatedModule, setGeneratedModule] = useState<Module | null>(null);
+
+  const isValidFile = (f: File) => {
+    return ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'].includes(f.type) ||
+      f.name.endsWith('.pdf') || f.name.endsWith('.docx') || f.name.endsWith('.txt');
+  };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -48,87 +53,6 @@ export default function ImportContent() {
     }
   };
 
-  const isValidFile = (f: File) => {
-    return ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'].includes(f.type) ||
-      f.name.endsWith('.pdf') || f.name.endsWith('.docx') || f.name.endsWith('.txt');
-  };
-
-  const handleGenerate = async () => {
-    if (!file || !moduleName) return;
-
-    setIsProcessing(true);
-    setProcessingStep(0);
-
-    // Simulate processing steps
-    await new Promise((r) => setTimeout(r, 1500));
-    setProcessingStep(1);
-    await new Promise((r) => setTimeout(r, 2000));
-    setProcessingStep(2);
-    await new Promise((r) => setTimeout(r, 1500));
-
-    // Generate fake module
-    const lessons = Array.from({ length: lessonCount[0] }, (_, i) => ({
-      id: `imported-${Date.now()}-${i}`,
-      moduleId: `imported-${Date.now()}`,
-      title: `Lección ${i + 1}: ${getLessonTopic(i)}`,
-      description: `Conceptos clave sobre ${getLessonTopic(i).toLowerCase()} extraídos del documento.`,
-      duration: 15 + Math.floor(Math.random() * 20),
-      order: i + 1,
-      content: [
-        { type: 'text' as const, content: `Contenido generado automáticamente basado en el documento "${file.name}". Esta lección cubre los conceptos fundamentales de ${getLessonTopic(i).toLowerCase()}.` },
-        { type: 'summary' as const, content: `• Conceptos clave de ${getLessonTopic(i)}\n• Aplicaciones prácticas\n• Ejercicios recomendados` },
-      ],
-    }));
-
-    const newModule = {
-      id: `imported-${Date.now()}`,
-      title: moduleName,
-      description: `Módulo generado automáticamente a partir de "${file.name}". Contiene ${lessonCount[0]} lecciones organizadas por nivel ${difficulty}.`,
-      difficulty,
-      thumbnail: '/images/module-advanced.jpg',
-      estimatedHours: Math.ceil(lessons.reduce((acc, l) => acc + l.duration, 0) / 60),
-      order: state.modules.length + 1,
-      category: 'Personalizado',
-      lessons,
-      quiz: {
-        id: `quiz-imported-${Date.now()}`,
-        moduleId: `imported-${Date.now()}`,
-        title: `Evaluación: ${moduleName}`,
-        passingScore: 70,
-        questions: [
-          {
-            id: `q-imp-1`,
-            question: '¿Cuál es el objetivo principal de este módulo?',
-            options: ['Aprender conceptos básicos', 'Dominar temas avanzados', 'Aplicar conocimientos prácticos', 'Todos los anteriores'],
-            correctAnswer: 3,
-            explanation: 'El módulo cubre conceptos desde básicos hasta avanzados con aplicaciones prácticas.',
-          },
-          {
-            id: `q-imp-2`,
-            question: '¿Qué herramienta se recomienda para práctica?',
-            options: ['VS Code', 'Android Studio', 'Xcode', 'Todas las anteriores'],
-            correctAnswer: 3,
-            explanation: 'Dependiendo de la plataforma objetivo, cualquiera de estas herramientas puede ser útil.',
-          },
-        ],
-      },
-    };
-
-    setGeneratedModule(newModule);
-    setIsProcessing(false);
-    addNotification('success', 'Módulo generado exitosamente ✅');
-  };
-
-  const handleSave = () => {
-    if (generatedModule) {
-      dispatch({ type: 'ADD_IMPORTED_MODULE', module: generatedModule });
-      addNotification('success', 'Módulo guardado en "Mis Módulos" 📚');
-      setGeneratedModule(null);
-      setFile(null);
-      setModuleName('');
-    }
-  };
-
   const getLessonTopic = (index: number) => {
     const topics = [
       'Introducción y Conceptos Básicos',
@@ -153,6 +77,83 @@ export default function ImportContent() {
       'Casos de Estudio',
     ];
     return topics[index % topics.length];
+  };
+
+  const handleGenerate = useCallback(async () => {
+    if (!file || !moduleName) return;
+
+    setIsProcessing(true);
+    setProcessingStep(0);
+
+    // Simulate processing steps
+    await new Promise((r) => setTimeout(r, 1500));
+    setProcessingStep(1);
+    await new Promise((r) => setTimeout(r, 2000));
+    setProcessingStep(2);
+    await new Promise((r) => setTimeout(r, 1500));
+
+    // Generate fake module (IDs generated once per generation)
+    const now = Date.now();
+    const lessons: Lesson[] = Array.from({ length: lessonCount[0] }, (_, i) => ({
+      id: `imported-${now}-${i}`,
+      moduleId: `imported-${now}`,
+      title: `Lección ${i + 1}: ${getLessonTopic(i)}`,
+      description: `Conceptos clave sobre ${getLessonTopic(i).toLowerCase()} extraídos del documento.`,
+      duration: 15 + Math.floor(Math.random() * 20),
+      order: i + 1,
+      content: [
+        { type: 'text', content: `Contenido generado automáticamente basado en el documento "${file.name}". Esta lección cubre los conceptos fundamentales de ${getLessonTopic(i).toLowerCase()}.` },
+        { type: 'summary', content: `• Conceptos clave de ${getLessonTopic(i)}\n• Aplicaciones prácticas\n• Ejercicios recomendados` },
+      ],
+    }));
+
+    const newModule: Module = {
+      id: `imported-${now}`,
+      title: moduleName,
+      description: `Módulo generado automáticamente a partir de "${file.name}". Contiene ${lessonCount[0]} lecciones organizadas por nivel ${difficulty}.`,
+      difficulty,
+      thumbnail: '/images/module-advanced.jpg',
+      estimatedHours: Math.ceil(lessons.reduce((acc, l) => acc + l.duration, 0) / 60),
+      order: state.modules.length + 1,
+      category: 'Personalizado',
+      lessons,
+      quiz: {
+        id: `quiz-imported-${now}`,
+        moduleId: `imported-${now}`,
+        title: `Evaluación: ${moduleName}`,
+        passingScore: 70,
+        questions: [
+          {
+            id: `q-imp-1`,
+            question: '¿Cuál es el objetivo principal de este módulo?',
+            options: ['Aprender conceptos básicos', 'Dominar temas avanzados', 'Aplicar conocimientos prácticos', 'Todos los anteriores'],
+            correctAnswer: 3,
+            explanation: 'El módulo cubre conceptos desde básicos hasta avanzados con aplicaciones prácticas.',
+          },
+          {
+            id: `q-imp-2`,
+            question: '¿Qué herramienta se recomienda para práctica?',
+            options: ['VS Code', 'Android Studio', 'Xcode', 'Todas las anteriores'],
+            correctAnswer: 3,
+            explanation: 'Dependiendo de la plataforma objetivo, cualquiera de estas herramientas puede ser útil.',
+          },
+        ],
+      },
+    };
+
+    setGeneratedModule(newModule);
+    setIsProcessing(false);
+    addNotification('success', 'Módulo generado exitosamente ✅');
+  }, [file, moduleName, lessonCount, difficulty, state.modules, addNotification]);
+
+  const handleSave = () => {
+    if (generatedModule) {
+      dispatch({ type: 'ADD_IMPORTED_MODULE', module: generatedModule });
+      addNotification('success', 'Módulo guardado en "Mis Módulos" 📚');
+      setGeneratedModule(null);
+      setFile(null);
+      setModuleName('');
+    }
   };
 
   const processingSteps = [
@@ -342,7 +343,7 @@ export default function ImportContent() {
             </div>
 
             <div className="space-y-2">
-              {generatedModule.lessons.map((lesson: any, i: number) => (
+              {generatedModule.lessons.map((lesson: Lesson, i: number) => (
                 <div
                   key={lesson.id}
                   className="flex items-center gap-3 py-2.5 px-3 bg-stone-50 dark:bg-stone-900/50 rounded-lg"
