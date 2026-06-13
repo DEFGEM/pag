@@ -26,6 +26,8 @@ module.exports = {
     // proyecto puede ajustar reglas específicas aquí
     'no-console': ['warn', { allow: ['warn', 'error'] }],
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    // Disable react-refresh rule that forces files to export only components. Many UI files export helpers/variants.
+    'react-refresh/only-export-components': 'off',
   },
   overrides: [
     {
