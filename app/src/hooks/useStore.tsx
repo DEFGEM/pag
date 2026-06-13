@@ -1,6 +1,78 @@
-import { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react';
-import type { AppState, Module, Notification } from '@/types';
+import { createContext, useContext, useReducer, useCallback, useEffect, type ReactNode } from 'react';
+import type { AppState, Module, Notification, UserProgress, UsersData, AppSettings } from '@/types';
 import { modules, achievements } from '@/data';
+
+const STORAGE_KEY_USERS = 'pag_users';
+const STORAGE_KEY_CURRENT_USER = 'pag_current_user';
+const STORAGE_KEY_SETTINGS = 'pag_settings';
+const STORAGE_KEY_IMPORTED = 'pag_imported_modules';
+
+function loadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveToStorage(key: string, data: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // storage full or unavailable
+  }
+}
+
+const defaultProgress: UserProgress = {
+  completedLessons: [],
+  completedModules: [],
+  completedQuizzes: {},
+  currentModuleId: null,
+  currentLessonId: null,
+  studyTimeMinutes: 0,
+  dailyStreak: 0,
+  lastStudyDate: null,
+};
+
+function getDefaultSettings(): AppSettings {
+  return {
+    isAdmin: false,
+    darkMode: false,
+    sidebarOpen: true,
+  };
+}
+
+function initializeState(): AppState {
+  const usersData = loadFromStorage<UsersData>(STORAGE_KEY_USERS, {});
+  const currentUserId = loadFromStorage<string | null>(STORAGE_KEY_CURRENT_USER, null);
+  const settings = loadFromStorage<AppSettings>(STORAGE_KEY_SETTINGS, getDefaultSettings());
+  const importedModules = loadFromStorage<Module[]>(STORAGE_KEY_IMPORTED, []);
+
+  const currentProgress = currentUserId && usersData[currentUserId]
+    ? usersData[currentUserId].progress
+    : defaultProgress;
+
+  return {
+    modules,
+    userProgress: currentProgress,
+    achievements,
+    usersData,
+    currentUserId,
+    isAdmin: settings.isAdmin,
+    darkMode: settings.darkMode,
+    sidebarOpen: settings.sidebarOpen,
+    notifications: [],
+    importedModules,
+  };
+}
+
+function persistProgress(usersData: UsersData, userId: string, progress: UserProgress) {
+  if (usersData[userId]) {
+    usersData[userId].progress = progress;
+  }
+  saveToStorage(STORAGE_KEY_USERS, usersData);
+}
 
 type Action =
   | { type: 'COMPLETE_LESSON'; lessonId: string }
@@ -14,27 +86,10 @@ type Action =
   | { type: 'ADD_IMPORTED_MODULE'; module: Module }
   | { type: 'TOGGLE_ADMIN' }
   | { type: 'UPDATE_STUDY_TIME'; minutes: number }
-  | { type: 'UNLOCK_ACHIEVEMENT'; achievementId: string };
-
-const initialState: AppState = {
-  modules,
-  userProgress: {
-    completedLessons: ['js-1', 'js-2', 'js-3', 'react-1', 'react-2'],
-    completedModules: ['js-fundamentals'],
-    completedQuizzes: { 'quiz-js': 80 },
-    currentModuleId: 'react-basics',
-    currentLessonId: 'react-3',
-    studyTimeMinutes: 360,
-    dailyStreak: 5,
-    lastStudyDate: '2026-06-11',
-  },
-  achievements,
-  isAdmin: true,
-  darkMode: false,
-  sidebarOpen: true,
-  notifications: [],
-  importedModules: [],
-};
+  | { type: 'UNLOCK_ACHIEVEMENT'; achievementId: string }
+  | { type: 'SET_USER'; userId: string }
+  | { type: 'REGISTER_USER'; userId: string; userName: string }
+  | { type: 'LOGOUT' };
 
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -42,13 +97,11 @@ function appReducer(state: AppState, action: Action): AppState {
       if (state.userProgress.completedLessons.includes(action.lessonId)) {
         return state;
       }
-      return {
-        ...state,
-        userProgress: {
-          ...state.userProgress,
-          completedLessons: [...state.userProgress.completedLessons, action.lessonId],
-        },
+      const newProgress = {
+        ...state.userProgress,
+        completedLessons: [...state.userProgress.completedLessons, action.lessonId],
       };
+      return { ...state, userProgress: newProgress };
     }
     case 'COMPLETE_MODULE': {
       if (state.userProgress.completedModules.includes(action.moduleId)) {
@@ -128,8 +181,57 @@ function appReducer(state: AppState, action: Action): AppState {
         ),
       };
     }
+    case 'SET_USER': {
+      const userData = state.usersData[action.userId];
+      return {
+        ...state,
+        currentUserId: action.userId,
+        userProgress: userData ? userData.progress : defaultProgress,
+      };
+    }
+    case 'REGISTER_USER': {
+      const newUsersData: UsersData = {
+        ...state.usersData,
+        [action.userId]: {
+          user: {
+            id: action.userId,
+            name: action.userName,
+            createdAt: new Date().toISOString(),
+          },
+          progress: defaultProgress,
+        },
+      };
+      return {
+        ...state,
+        usersData: newUsersData,
+        currentUserId: action.userId,
+        userProgress: defaultProgress,
+      };
+    }
+    case 'LOGOUT': {
+      return {
+        ...state,
+        currentUserId: null,
+        userProgress: defaultProgress,
+      };
+    }
     default:
       return state;
+  }
+}
+
+function saveAppState(state: AppState) {
+  saveToStorage(STORAGE_KEY_SETTINGS, {
+    isAdmin: state.isAdmin,
+    darkMode: state.darkMode,
+    sidebarOpen: state.sidebarOpen,
+  });
+  saveToStorage(STORAGE_KEY_CURRENT_USER, state.currentUserId);
+  saveToStorage(STORAGE_KEY_USERS, state.usersData);
+  saveToStorage(STORAGE_KEY_IMPORTED, state.importedModules);
+
+  if (state.currentUserId && state.usersData[state.currentUserId]) {
+    persistProgress(state.usersData, state.currentUserId, state.userProgress);
   }
 }
 
@@ -141,12 +243,20 @@ interface StoreContextType {
   addNotification: (type: Notification['type'], message: string) => void;
   getModuleProgress: (moduleId: string) => number;
   getOverallProgress: () => number;
+  setUser: (userId: string) => void;
+  registerUser: (userId: string, userName: string) => void;
+  logout: () => void;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(appReducer, initialState);
+  const [state, dispatch] = useReducer(appReducer, undefined, initializeState);
+
+  useEffect(() => {
+    saveAppState(state);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.usersData, state.currentUserId, state.userProgress, state.isAdmin, state.darkMode, state.sidebarOpen, state.importedModules]);
 
   const completeLesson = useCallback((lessonId: string) => {
     dispatch({ type: 'COMPLETE_LESSON', lessonId });
@@ -187,6 +297,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return Math.round((completedLessons / totalLessons) * 100);
   }, [state.modules, state.userProgress.completedLessons]);
 
+  const setUser = useCallback((userId: string) => {
+    dispatch({ type: 'SET_USER', userId });
+  }, []);
+
+  const registerUser = useCallback((userId: string, userName: string) => {
+    dispatch({ type: 'REGISTER_USER', userId, userName });
+  }, []);
+
+  const logout = useCallback(() => {
+    dispatch({ type: 'LOGOUT' });
+  }, []);
+
   return (
     <StoreContext.Provider
       value={{
@@ -197,6 +319,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         addNotification,
         getModuleProgress,
         getOverallProgress,
+        setUser,
+        registerUser,
+        logout,
       }}
     >
       {children}
@@ -204,6 +329,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/* eslint-disable react-refresh/only-export-components */
 export function useStore() {
   const context = useContext(StoreContext);
   if (!context) {

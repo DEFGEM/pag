@@ -74,10 +74,31 @@ export type AchievementCondition =
   | { type: 'complete_all_modules' }
   | { type: 'study_time'; minutes: number };
 
+export interface User {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface UsersData {
+  [userId: string]: {
+    user: User;
+    progress: UserProgress;
+  };
+}
+
+export interface AppSettings {
+  isAdmin: boolean;
+  darkMode: boolean;
+  sidebarOpen: boolean;
+}
+
 export interface AppState {
   modules: Module[];
   userProgress: UserProgress;
   achievements: Achievement[];
+  usersData: UsersData;
+  currentUserId: string | null;
   isAdmin: boolean;
   darkMode: boolean;
   sidebarOpen: boolean;

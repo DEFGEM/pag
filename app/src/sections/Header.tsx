@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
-import { useStore } from '@/hooks/useStore';
 import { Search, ChevronRight } from 'lucide-react';
+
+
 
 const routeNames: Record<string, string> = {
   '/': 'Dashboard',
@@ -15,8 +16,8 @@ const routeNames: Record<string, string> = {
 
 export default function Header() {
   const location = useLocation();
-  const { state } = useStore();
-  const { sidebarOpen } = state;
+
+
 
   const path = location.pathname;
   const pageTitle = routeNames[path] || 'React Native desde Cero';
@@ -40,7 +41,7 @@ export default function Header() {
         px-6 py-4 bg-stone-50/80 dark:bg-stone-900/80 backdrop-blur-md
         border-b border-stone-200 dark:border-stone-800
         transition-all duration-300
-        ${sidebarOpen ? 'md:ml-0' : 'md:ml-0'}
+        md:ml-0
       `}
     >
       {/* Left: Breadcrumb */}
@@ -73,6 +74,7 @@ export default function Header() {
           <input
             type="text"
             placeholder="Buscar lecciones..."
+            aria-label="Buscar lecciones"
             className="
               w-[240px] lg:w-[320px] pl-9 pr-4 py-2.5
               bg-white dark:bg-stone-800

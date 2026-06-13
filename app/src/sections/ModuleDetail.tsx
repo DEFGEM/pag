@@ -3,6 +3,7 @@ import { useStore } from '@/hooks/useStore';
 import { Clock, CheckCircle2, Lock, ChevronRight, PlayCircle, ClipboardCheck } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
+import { difficultyBadge } from '@/lib/utils';
 
 export default function ModuleDetail() {
   const { moduleId } = useParams<{ moduleId: string }>();
@@ -43,15 +44,6 @@ export default function ModuleDetail() {
   ).length;
   const allLessonsCompleted = completedLessonsCount === mod.lessons.length;
   const quizDone = userProgress.completedQuizzes[mod.quiz.id];
-
-  const difficultyBadge = (diff: string) => {
-    const styles: Record<string, string> = {
-      basico: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-      intermedio: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-      avanzado: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-    };
-    return styles[diff] || styles.basico;
-  };
 
   const lessonStatus = (lessonId: string, index: number) => {
     const isCompleted = userProgress.completedLessons.includes(lessonId);

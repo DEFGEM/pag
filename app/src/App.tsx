@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { StoreProvider } from '@/hooks/useStore';
+import { useStore } from '@/hooks/useStore';
 import Sidebar from '@/sections/Sidebar';
 import Header from '@/sections/Header';
 import Dashboard from '@/sections/Dashboard';
@@ -14,11 +15,15 @@ import AdminModules from '@/sections/AdminModules';
 import AdminExams from '@/sections/AdminExams';
 import AdminStats from '@/sections/AdminStats';
 import ToastNotifications from '@/components/ToastNotifications';
-import { useStore } from '@/hooks/useStore';
+import UserLogin from '@/sections/UserLogin';
 
 function AppLayout() {
   const { state } = useStore();
-  const { darkMode, sidebarOpen } = state;
+  const { darkMode, sidebarOpen, currentUserId } = state;
+
+  if (!currentUserId) {
+    return <UserLogin />;
+  }
 
   return (
     <div className={darkMode ? 'dark' : ''}>

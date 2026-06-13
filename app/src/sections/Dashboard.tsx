@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
 import { Progress } from '@/components/ui/progress';
+import { difficultyBadge } from '@/lib/utils';
 import {
   BookOpen,
   Clock,
@@ -18,6 +19,7 @@ import gsap from 'gsap';
 
 export default function Dashboard() {
   const { state, getModuleProgress, getOverallProgress } = useStore();
+  const currentUser = state.currentUserId ? state.usersData[state.currentUserId]?.user : null;
   const navigate = useNavigate();
   const cardsRef = useRef<HTMLDivElement>(null);
   const modulesRef = useRef<HTMLDivElement>(null);
@@ -99,22 +101,13 @@ export default function Dashboard() {
     },
   ];
 
-  const difficultyBadge = (diff: string) => {
-    const styles: Record<string, string> = {
-      basico: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-      intermedio: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-      avanzado: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-    };
-    return styles[diff] || styles.basico;
-  };
-
   return (
     <div className="p-6 space-y-8">
       {/* Welcome Section */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500/10 via-teal-500/5 to-purple-500/10 dark:from-indigo-900/20 dark:via-teal-900/10 dark:to-purple-900/20 border border-indigo-100 dark:border-indigo-800/30 p-8">
         <div className="relative z-10">
           <h2 className="text-2xl font-medium text-stone-900 dark:text-stone-100">
-            Hola, Estudiante 👋
+            Hola, {currentUser?.name || 'Estudiante'} 👋
           </h2>
           <p className="text-stone-600 dark:text-stone-400 mt-1">
             Continúa tu aprendizaje donde lo dejaste.

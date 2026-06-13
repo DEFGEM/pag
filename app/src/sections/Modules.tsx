@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
 import { Clock, BookOpen, CheckCircle2, Lock } from 'lucide-react';
 import gsap from 'gsap';
+import { difficultyBadge } from '@/lib/utils';
 import type { Difficulty } from '@/types';
 
 const filters: { label: string; value: Difficulty | 'todos' }[] = [
@@ -11,15 +12,6 @@ const filters: { label: string; value: Difficulty | 'todos' }[] = [
   { label: 'Intermedio', value: 'intermedio' },
   { label: 'Avanzado', value: 'avanzado' },
 ];
-
-const difficultyBadge = (diff: Difficulty) => {
-  const styles: Record<string, string> = {
-    basico: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    intermedio: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    avanzado: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-  };
-  return styles[diff] || styles.basico;
-};
 
 export default function Modules() {
   const { state, getModuleProgress } = useStore();

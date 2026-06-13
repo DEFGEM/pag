@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
 import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, Trophy, ArrowLeft, RotateCcw } from 'lucide-react';
@@ -54,37 +54,34 @@ export default function Quiz() {
   const hasAnswered = selectedAnswers[question.id] !== undefined;
   const isCorrect = hasAnswered && selectedAnswers[question.id] === question.correctAnswer;
 
-  const handleSelectAnswer = useCallback(
-    (optionIndex: number) => {
-      if (showFeedback) return;
-      setSelectedAnswers((prev) => ({ ...prev, [question.id]: optionIndex }));
-      setShowFeedback(true);
-    },
-    [showFeedback, question.id]
-  );
+  function handleSelectAnswer(optionIndex: number) {
+    if (showFeedback) return;
+    setSelectedAnswers((prev) => ({ ...prev, [question.id]: optionIndex }));
+    setShowFeedback(true);
+  }
 
-  const handleNext = useCallback(() => {
+  function handleNext() {
     if (currentQuestion < totalQuestions - 1) {
       setCurrentQuestion((prev) => prev + 1);
       setShowFeedback(false);
     } else {
       // Calculate final score
       let correct = 0;
-      quiz.questions.forEach((q) => {
+      quiz!.questions.forEach((q) => {
         if (selectedAnswers[q.id] === q.correctAnswer) correct++;
       });
       const finalScore = Math.round((correct / totalQuestions) * 100);
       setScore(finalScore);
       setIsFinished(true);
-      completeQuiz(quiz.id, finalScore);
+      completeQuiz(quiz!.id, finalScore);
 
-      if (finalScore >= quiz.passingScore) {
+      if (finalScore >= quiz!.passingScore) {
         addNotification('success', `¡Evaluación aprobada con ${finalScore}%! 🎉`);
       } else {
-        addNotification('info', `Obtuviste ${finalScore}%. Necesitas ${quiz.passingScore}% para aprobar.`);
+        addNotification('info', `Obtuviste ${finalScore}%. Necesitas ${quiz!.passingScore}% para aprobar.`);
       }
     }
-  }, [currentQuestion, totalQuestions, quiz, selectedAnswers, completeQuiz, addNotification]);
+  }
 
   const handleRestart = () => {
     setCurrentQuestion(0);

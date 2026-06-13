@@ -4,6 +4,38 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, CheckCircle2, Clock, Copy, Check, BookOpen, Lightbulb } from 'lucide-react';
 import gsap from 'gsap';
 
+function renderSafeContent(text: string, codeClass = 'px-1.5 py-0.5 bg-stone-100 dark:bg-stone-800 rounded text-sm font-mono text-indigo-600 dark:text-indigo-400', strongClass = 'text-stone-900 dark:text-stone-100') {
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    const codeMatch = remaining.match(/^`([^`]+)`/);
+    if (codeMatch) {
+      parts.push(<code key={key++} className={codeClass}>{codeMatch[1]}</code>);
+      remaining = remaining.slice(codeMatch[0].length);
+      continue;
+    }
+    const boldMatch = remaining.match(/^\*\*(.+?)\*\*/);
+    if (boldMatch) {
+      parts.push(<strong key={key++} className={strongClass}>{boldMatch[1]}</strong>);
+      remaining = remaining.slice(boldMatch[0].length);
+      continue;
+    }
+    const newlineMatch = remaining.match(/^\n/);
+    if (newlineMatch) {
+      parts.push(<br key={key++} />);
+      remaining = remaining.slice(1);
+      continue;
+    }
+    const char = remaining[0];
+    parts.push(char);
+    remaining = remaining.slice(1);
+  }
+
+  return parts;
+}
+
 export default function Lesson() {
   const { moduleId, lessonId } = useParams<{ moduleId: string; lessonId: string }>();
   const { state, completeLesson, addNotification } = useStore();
@@ -100,13 +132,9 @@ export default function Lesson() {
               <div
                 key={id}
                 className="text-stone-700 dark:text-stone-300 leading-relaxed text-base"
-                dangerouslySetInnerHTML={{
-                  __html: content.content
-                    .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 bg-stone-100 dark:bg-stone-800 rounded text-sm font-mono text-indigo-600 dark:text-indigo-400">$1</code>')
-                    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-stone-900 dark:text-stone-100">$1</strong>')
-                    .replace(/\n/g, '<br/>'),
-                }}
-              />
+              >
+                {renderSafeContent(content.content)}
+              </div>
             );
           }
 
@@ -155,14 +183,9 @@ export default function Lesson() {
                   {style?.label}
                 </span>
               </div>
-              <div
-                className="text-sm text-stone-700 dark:text-stone-300 whitespace-pre-line leading-relaxed"
-                dangerouslySetInnerHTML={{
-                  __html: content.content
-                    .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-stone-100 dark:bg-stone-800 rounded text-xs font-mono text-indigo-600 dark:text-indigo-400">$1</code>')
-                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'),
-                }}
-              />
+              <div className="text-sm text-stone-700 dark:text-stone-300 whitespace-pre-line leading-relaxed">
+                {renderSafeContent(content.content, 'px-1 py-0.5 bg-stone-100 dark:bg-stone-800 rounded text-xs font-mono text-indigo-600 dark:text-indigo-400', '')}
+              </div>
             </div>
           );
         })}

@@ -124,14 +124,14 @@ export default function ImportContent() {
         passingScore: 70,
         questions: [
           {
-            id: `q-imp-1`,
+            id: `q-imp-${now}-1`,
             question: '¿Cuál es el objetivo principal de este módulo?',
             options: ['Aprender conceptos básicos', 'Dominar temas avanzados', 'Aplicar conocimientos prácticos', 'Todos los anteriores'],
             correctAnswer: 3,
             explanation: 'El módulo cubre conceptos desde básicos hasta avanzados con aplicaciones prácticas.',
           },
           {
-            id: `q-imp-2`,
+            id: `q-imp-${now}-2`,
             question: '¿Qué herramienta se recomienda para práctica?',
             options: ['VS Code', 'Android Studio', 'Xcode', 'Todas las anteriores'],
             correctAnswer: 3,

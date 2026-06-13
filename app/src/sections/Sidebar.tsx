@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  LogOut,
 } from 'lucide-react';
 
 const mainNavItems = [
@@ -34,10 +35,11 @@ const adminNavItems = [
 ];
 
 export default function Sidebar() {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, logout } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const { darkMode, sidebarOpen, isAdmin } = state;
+  const { darkMode, sidebarOpen, isAdmin, currentUserId, usersData } = state;
+  const currentUser = currentUserId ? usersData[currentUserId]?.user : null;
 
   const toggleDarkMode = () => dispatch({ type: 'TOGGLE_DARK_MODE' });
   const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
@@ -92,6 +94,7 @@ export default function Sidebar() {
       {/* Mobile hamburger */}
       <button
         onClick={toggleSidebar}
+        aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
         className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-white dark:bg-stone-800 shadow-md md:hidden"
       >
         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
@@ -144,6 +147,7 @@ export default function Sidebar() {
           {/* Dark Mode Toggle */}
           <button
             onClick={toggleDarkMode}
+            aria-label={darkMode ? 'Modo claro' : 'Modo oscuro'}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800/60 transition-all duration-200 cursor-pointer ${!sidebarOpen ? 'justify-center px-2' : ''}`}
           >
             {darkMode ? <Sun size={20} strokeWidth={1.8} /> : <Moon size={20} strokeWidth={1.8} />}
@@ -157,15 +161,26 @@ export default function Sidebar() {
             </div>
             {sidebarOpen && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate">Estudiante</p>
+                <p className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate">{currentUser?.name || 'Sin usuario'}</p>
                 <p className="text-xs text-stone-500 dark:text-stone-400 truncate">Racha: {state.userProgress.dailyStreak} días 🔥</p>
               </div>
             )}
           </div>
 
+          {/* Switch User */}
+          <button
+            onClick={logout}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800/60 transition-all duration-200 cursor-pointer ${!sidebarOpen ? 'justify-center px-2' : ''}`}
+            aria-label="Cambiar de usuario"
+          >
+            <LogOut size={20} strokeWidth={1.8} />
+            {sidebarOpen && <span>Cambiar usuario</span>}
+          </button>
+
           {/* Toggle Button (desktop) */}
           <button
             onClick={toggleSidebar}
+            aria-label={sidebarOpen ? 'Colapsar menú' : 'Expandir menú'}
             className="hidden md:flex w-full items-center justify-center py-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors cursor-pointer"
           >
             {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}

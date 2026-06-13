@@ -1,13 +1,15 @@
 import { useStore } from '@/hooks/useStore';
 import { useState } from 'react';
+import type { Module } from '@/types';
 import { Edit3, Trash2, Eye, Search, Plus, BookOpen, Clock } from 'lucide-react';
+import { difficultyBadge } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 export default function AdminModules() {
   const { state } = useStore();
   const { modules } = state;
   const [search, setSearch] = useState('');
-  const [editModule, setEditModule] = useState<any>(null);
+  const [editModule, setEditModule] = useState<Module | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const filtered = modules.filter(
@@ -15,15 +17,6 @@ export default function AdminModules() {
       m.title.toLowerCase().includes(search.toLowerCase()) ||
       m.description.toLowerCase().includes(search.toLowerCase())
   );
-
-  const difficultyBadge = (diff: string) => {
-    const styles: Record<string, string> = {
-      basico: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-      intermedio: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-      avanzado: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-    };
-    return styles[diff] || styles.basico;
-  };
 
   const statusBadge = (active: boolean) => {
     return active
@@ -55,6 +48,7 @@ export default function AdminModules() {
         <input
           type="text"
           placeholder="Buscar módulos..."
+          aria-label="Buscar módulos"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
@@ -126,20 +120,20 @@ export default function AdminModules() {
                     <div className="flex items-center justify-end gap-1">
                       <button
                         className="p-1.5 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors cursor-pointer"
-                        title="Ver"
+                        aria-label="Ver módulo"
                       >
                         <Eye size={15} className="text-stone-500" />
                       </button>
                       <button
                         onClick={() => { setEditModule(mod); setDialogOpen(true); }}
                         className="p-1.5 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors cursor-pointer"
-                        title="Editar"
+                        aria-label="Editar módulo"
                       >
                         <Edit3 size={15} className="text-stone-500" />
                       </button>
                       <button
                         className="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-lg transition-colors cursor-pointer"
-                        title="Eliminar"
+                        aria-label="Eliminar módulo"
                       >
                         <Trash2 size={15} className="text-rose-500" />
                       </button>
