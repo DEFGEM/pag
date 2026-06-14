@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
-import { Clock, BookOpen, CheckCircle2, Lock } from 'lucide-react';
+import { Clock, BookOpen, CheckCircle2, Lock, User } from 'lucide-react';
 import gsap from 'gsap';
 import { difficultyBadge } from '@/lib/utils';
 import type { Difficulty } from '@/types';
 
-const filters: { label: string; value: Difficulty | 'todos' }[] = [
+const filters: { label: string; value: Difficulty | 'todos' | 'mios' }[] = [
   { label: 'Todos', value: 'todos' },
+  { label: 'Míos', value: 'mios' },
   { label: 'Básico', value: 'basico' },
   { label: 'Intermedio', value: 'intermedio' },
   { label: 'Avanzado', value: 'avanzado' },
@@ -16,13 +17,37 @@ const filters: { label: string; value: Difficulty | 'todos' }[] = [
 export default function Modules() {
   const { state, getModuleProgress } = useStore();
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<Difficulty | 'todos'>('todos');
+  const [filter, setFilter] = useState<Difficulty | 'todos' | 'mios'>('todos');
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const { modules, userProgress } = state;
+  const { modules, userProgress, usersData, currentUserId, isAdmin } = state;
+
+  // Find owner of a custom module
+  const getModuleOwner = (moduleId: string) => {
+    for (const [uid, data] of Object.entries(usersData)) {
+      if (data.customModules?.some((m) => m.id === moduleId)) {
+        return { id: uid, name: data.user.name };
+      }
+    }
+    return null;
+  };
+
+  const isUserModule = (moduleId: string) => {
+    return getModuleOwner(moduleId) !== null;
+  };
 
   const filteredModules =
-    filter === 'todos' ? modules : modules.filter((m) => m.difficulty === filter);
+    filter === 'todos'
+      ? modules
+      : filter === 'mios'
+        ? modules.filter((m) => {
+            const owner = getModuleOwner(m.id);
+            if (!owner) return false;
+            // Admin sees all user modules, regular user sees only their own
+            if (isAdmin) return true;
+            return owner.id === currentUserId;
+          })
+        : modules.filter((m) => m.difficulty === filter);
 
   useEffect(() => {
     if (gridRef.current) {
@@ -85,10 +110,16 @@ export default function Modules() {
                   alt={mod.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <div className="absolute top-3 left-3">
+                <div className="absolute top-3 left-3 flex items-center gap-2">
                   <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full ${difficultyBadge(mod.difficulty)}`}>
                     {mod.difficulty}
                   </span>
+                  {isUserModule(mod.id) && isAdmin && (
+                    <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 flex items-center gap-1">
+                      <User size={10} />
+                      {getModuleOwner(mod.id)?.name}
+                    </span>
+                  )}
                 </div>
                 {isCompleted && (
                   <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center">
