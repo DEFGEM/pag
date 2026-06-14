@@ -100,6 +100,7 @@ type Action =
   | { type: 'TOGGLE_DARK_MODE' }
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'ADD_IMPORTED_MODULE'; module: Module }
+  | { type: 'UPDATE_MODULE'; moduleId: string; updates: Partial<Module> }
   | { type: 'DELETE_IMPORTED_MODULE'; moduleId: string }
   | { type: 'TOGGLE_ADMIN' }
   | { type: 'UPDATE_STUDY_TIME'; minutes: number }
@@ -179,6 +180,19 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         importedModules: updatedImported,
         modules: [...modules, ...updatedImported],
+      };
+    }
+    case 'UPDATE_MODULE': {
+      const updateImported = state.importedModules.map((m) =>
+        m.id === action.moduleId ? { ...m, ...action.updates } : m
+      );
+      const updateAll = state.modules.map((m) =>
+        m.id === action.moduleId ? { ...m, ...action.updates } : m
+      );
+      return {
+        ...state,
+        importedModules: updateImported,
+        modules: updateAll,
       };
     }
     case 'DELETE_IMPORTED_MODULE': {

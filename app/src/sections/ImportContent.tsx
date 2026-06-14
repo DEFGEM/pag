@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react';
 import { useStore } from '@/hooks/useStore';
 import { Upload, FileText, X, Loader2, BookOpen, CheckCircle2, Sparkles, FileCode, HelpCircle, File } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
-import type { Difficulty, Module, Lesson } from '@/types';
+import QuizEditor from '@/components/QuizEditor';
+import type { Difficulty, Module, Lesson, Question } from '@/types';
 
 async function extractPdfText(file: File): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist');
@@ -542,35 +543,17 @@ export default function ImportContent() {
               ))}
             </div>
 
-            {/* Quiz Preview */}
+            {/* Quiz Editor */}
             <div className="mt-5 pt-4 border-t border-stone-200 dark:border-stone-800">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-3 flex items-center gap-1.5">
-                <HelpCircle size={14} />
-                Evaluación ({generatedModule.quiz.questions.length} preguntas)
-              </h4>
-              <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
-                {generatedModule.quiz.questions.map((q: any, i: number) => (
-                  <div key={q.id} className="p-3 bg-stone-50/50 dark:bg-stone-900/30 rounded-xl border border-stone-100 dark:border-stone-800/40">
-                    <p className="text-xs font-medium text-stone-800 dark:text-stone-200">
-                      {i + 1}. {q.question}
-                    </p>
-                    <div className="grid grid-cols-1 gap-1.5 mt-2">
-                      {q.options.map((opt: string, idx: number) => (
-                        <div
-                          key={idx}
-                          className={`text-[11px] px-2.5 py-1.5 rounded border ${
-                            idx === q.correctAnswer
-                              ? 'bg-teal-50 border-teal-200 text-teal-700 dark:bg-teal-900/20 dark:border-teal-800/40 dark:text-teal-400 font-medium'
-                              : 'bg-white border-stone-100 text-stone-500 dark:bg-stone-900 dark:border-stone-800'
-                          }`}
-                        >
-                          {String.fromCharCode(97 + idx)}) {opt}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <QuizEditor
+                questions={generatedModule.quiz.questions}
+                onChange={(updatedQuestions: Question[]) => {
+                  setGeneratedModule({
+                    ...generatedModule,
+                    quiz: { ...generatedModule.quiz, questions: updatedQuestions },
+                  });
+                }}
+              />
             </div>
           </div>
 
