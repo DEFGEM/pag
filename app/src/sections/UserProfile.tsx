@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
-import { User, Mail, Calendar, BookOpen, Clock, Trophy, Flame, Save, Download, Shield } from 'lucide-react';
+import { User, Mail, Calendar, BookOpen, Clock, Trophy, Flame, Save, Download, Shield, FolderCog } from 'lucide-react';
 
 export default function UserProfile() {
   const { state, addNotification, getOverallProgress } = useStore();
+  const navigate = useNavigate();
   const { currentUserId, usersData, userProgress, modules } = state;
   const currentUser = currentUserId ? usersData[currentUserId]?.user : null;
 
@@ -153,6 +155,13 @@ export default function UserProfile() {
               >
                 <Download size={14} />
                 Exportar Progreso
+              </button>
+              <button
+                onClick={() => navigate('/my-modules')}
+                className="w-full py-2.5 px-4 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                <FolderCog size={14} />
+                Mis Módulos
               </button>
             </div>
           </div>
