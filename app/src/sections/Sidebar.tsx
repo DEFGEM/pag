@@ -27,6 +27,7 @@ import {
 const mainNavItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { label: 'Módulos', path: '/modules', icon: BookOpen },
+  { label: 'Mis Módulos', path: '/my-modules', icon: FolderCog },
   { label: 'Playground', path: '/playground', icon: Code },
   { label: 'Evaluaciones', path: '/evaluations', icon: ClipboardCheck },
   { label: 'Logros', path: '/achievements', icon: Trophy },

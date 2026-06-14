@@ -63,16 +63,29 @@ function initializeState(): AppState {
         createdAt: new Date().toISOString(),
       },
       progress: defaultProgress,
+      customModules: [],
     };
     saveToStorage(STORAGE_KEY_USERS, usersData);
   }
+
+  // Ensure all users have customModules field
+  Object.keys(usersData).forEach((uid) => {
+    if (!usersData[uid].customModules) {
+      usersData[uid].customModules = [];
+    }
+  });
 
   const currentProgress = currentUserId && usersData[currentUserId]
     ? { ...defaultProgress, ...usersData[currentUserId].progress }
     : defaultProgress;
 
+  // Load current user's custom modules
+  const userCustomModules = currentUserId && usersData[currentUserId]?.customModules
+    ? usersData[currentUserId].customModules
+    : [];
+
   return {
-    modules: [...modules, ...importedModules],
+    modules: [...modules, ...importedModules, ...userCustomModules],
     userProgress: currentProgress,
     achievements,
     usersData,
@@ -104,6 +117,9 @@ type Action =
   | { type: 'ADD_IMPORTED_MODULE'; module: Module }
   | { type: 'UPDATE_MODULE'; moduleId: string; updates: Partial<Module> }
   | { type: 'DELETE_IMPORTED_MODULE'; moduleId: string }
+  | { type: 'ADD_USER_MODULE'; module: Module }
+  | { type: 'UPDATE_USER_MODULE'; moduleId: string; updates: Partial<Module> }
+  | { type: 'DELETE_USER_MODULE'; moduleId: string }
   | { type: 'TOGGLE_ADMIN' }
   | { type: 'UPDATE_STUDY_TIME'; minutes: number }
   | { type: 'UNLOCK_ACHIEVEMENT'; achievementId: string }
@@ -209,6 +225,56 @@ function appReducer(state: AppState, action: Action): AppState {
         modules: [...modules, ...updatedImported],
       };
     }
+    case 'ADD_USER_MODULE': {
+      if (!state.currentUserId) return state;
+      const userData = state.usersData[state.currentUserId];
+      if (!userData) return state;
+      const updatedCustom = [...(userData.customModules || []), action.module];
+      const updatedUsersData = {
+        ...state.usersData,
+        [state.currentUserId]: { ...userData, customModules: updatedCustom },
+      };
+      return {
+        ...state,
+        usersData: updatedUsersData,
+        modules: [...modules, ...state.importedModules, ...updatedCustom],
+      };
+    }
+    case 'UPDATE_USER_MODULE': {
+      if (!state.currentUserId) return state;
+      const userData = state.usersData[state.currentUserId];
+      if (!userData) return state;
+      const updatedCustom = (userData.customModules || []).map((m) =>
+        m.id === action.moduleId ? { ...m, ...action.updates } : m
+      );
+      const updatedUsersData = {
+        ...state.usersData,
+        [state.currentUserId]: { ...userData, customModules: updatedCustom },
+      };
+      const updatedAll = state.modules.map((m) =>
+        m.id === action.moduleId ? { ...m, ...action.updates } : m
+      );
+      return {
+        ...state,
+        usersData: updatedUsersData,
+        modules: updatedAll,
+      };
+    }
+    case 'DELETE_USER_MODULE': {
+      if (!state.currentUserId) return state;
+      const userData = state.usersData[state.currentUserId];
+      if (!userData) return state;
+      const updatedCustom = (userData.customModules || []).filter((m) => m.id !== action.moduleId);
+      const updatedUsersData = {
+        ...state.usersData,
+        [state.currentUserId]: { ...userData, customModules: updatedCustom },
+      };
+      return {
+        ...state,
+        usersData: updatedUsersData,
+        modules: [...modules, ...state.importedModules, ...updatedCustom],
+      };
+    }
     case 'TOGGLE_ADMIN': {
       return { ...state, isAdmin: !state.isAdmin };
     }
@@ -231,10 +297,12 @@ function appReducer(state: AppState, action: Action): AppState {
     }
     case 'SET_USER': {
       const userData = state.usersData[action.userId];
+      const userCustom = userData?.customModules || [];
       return {
         ...state,
         currentUserId: action.userId,
-        userProgress: userData ? userData.progress : defaultProgress,
+        userProgress: userData ? { ...defaultProgress, ...userData.progress } : defaultProgress,
+        modules: [...modules, ...state.importedModules, ...userCustom],
       };
     }
     case 'REGISTER_USER': {
@@ -250,6 +318,7 @@ function appReducer(state: AppState, action: Action): AppState {
             createdAt: new Date().toISOString(),
           },
           progress: defaultProgress,
+          customModules: [],
         },
       };
       return {
@@ -267,10 +336,12 @@ function appReducer(state: AppState, action: Action): AppState {
       if (!userEntry) {
         return state;
       }
+      const loginUserCustom = userEntry.customModules || [];
       return {
         ...state,
         currentUserId: userEntry.user.id,
-        userProgress: userEntry.progress,
+        userProgress: { ...defaultProgress, ...userEntry.progress },
+        modules: [...modules, ...state.importedModules, ...loginUserCustom],
         isAdmin: userEntry.user.isAdmin || false,
       };
     }

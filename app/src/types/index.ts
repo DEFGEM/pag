@@ -97,6 +97,7 @@ export interface UsersData {
   [userId: string]: {
     user: User;
     progress: UserProgress;
+    customModules: Module[]; // módulos creados por este usuario (solo él los ve)
   };
 }
 
