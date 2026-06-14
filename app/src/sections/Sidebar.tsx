@@ -40,8 +40,9 @@ export default function Sidebar() {
   const { state, dispatch, logout, getOverallProgress } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const { darkMode, sidebarOpen, isAdmin, currentUserId, usersData } = state;
+  const { darkMode, sidebarOpen, currentUserId, usersData } = state;
   const currentUser = currentUserId ? usersData[currentUserId]?.user : null;
+  const isUserAdmin = currentUser?.isAdmin || false;
   const overallProgress = getOverallProgress();
 
   const toggleDarkMode = () => dispatch({ type: 'TOGGLE_DARK_MODE' });
@@ -142,7 +143,7 @@ export default function Sidebar() {
         <nav className={`flex-1 overflow-y-auto py-4 ${sidebarOpen ? 'px-3' : 'px-2'} space-y-1`}>
           {mainNavItems.map(renderNavItem)}
 
-          {isAdmin && (
+          {isUserAdmin && (
             <>
               {sidebarOpen && (
                 <div className="pt-4 pb-2 px-4">
@@ -160,19 +161,6 @@ export default function Sidebar() {
 
         {/* Bottom Actions */}
         <div className={`border-t border-stone-200 dark:border-stone-800 py-3 ${sidebarOpen ? 'px-3' : 'px-2'} space-y-1`}>
-          {/* Admin Toggle */}
-          <button
-            onClick={() => dispatch({ type: 'TOGGLE_ADMIN' })}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-              isAdmin
-                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
-                : 'text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800/60'
-            } ${!sidebarOpen ? 'justify-center px-2' : ''}`}
-          >
-            <Shield size={20} strokeWidth={1.8} />
-            {sidebarOpen && <span>{isAdmin ? 'Modo Admin' : 'Activar Admin'}</span>}
-          </button>
-
           {/* Dark Mode Toggle */}
           <button
             onClick={toggleDarkMode}

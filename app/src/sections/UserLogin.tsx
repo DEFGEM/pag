@@ -1,17 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/hooks/useStore';
-import { Atom, User, ArrowRight, LogIn, Plus, Sparkles, BookOpen, Trophy, Zap } from 'lucide-react';
+import { Atom, User, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, ArrowRight, Sparkles, BookOpen, Trophy, Zap } from 'lucide-react';
 import gsap from 'gsap';
 
 export default function UserLogin() {
-  const { state, setUser, registerUser } = useStore();
-  const [showNewUser, setShowNewUser] = useState(false);
-  const [newName, setNewName] = useState('');
+  const { state, loginUser, registerUser } = useStore();
+  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Login form
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Register form
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+
   const heroRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
-
-  const existingUsers = Object.values(state.usersData);
 
   useEffect(() => {
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
@@ -26,16 +36,58 @@ export default function UserLogin() {
     }
   }, []);
 
-  const handleSelectUser = (userId: string) => {
-    setUser(userId);
+  const handleLogin = () => {
+    setError('');
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      setError('Ingresa tu correo y contraseña');
+      return;
+    }
+    const success = loginUser(loginEmail.trim(), loginPassword);
+    if (!success) {
+      setError('Correo o contraseña incorrectos');
+    }
   };
 
-  const handleCreateUser = () => {
-    const name = newName.trim();
-    if (!name) return;
-    const userId = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    if (!userId) return;
-    registerUser(userId, name);
+  const handleRegister = () => {
+    setError('');
+    setSuccess('');
+    if (!regName.trim() || !regEmail.trim() || !regPassword.trim()) {
+      setError('Todos los campos son obligatorios');
+      return;
+    }
+    if (regPassword.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
+    // Check if email already exists
+    const emailExists = Object.values(state.usersData).some(
+      (u) => u.user.email === regEmail.trim()
+    );
+    if (emailExists) {
+      setError('Este correo ya está registrado');
+      return;
+    }
+
+    const userId = regName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    if (!userId) {
+      setError('Nombre no válido');
+      return;
+    }
+
+    registerUser(userId, regName.trim(), regEmail.trim(), regPassword);
+    setSuccess('Cuenta creada correctamente');
+    setRegName('');
+    setRegEmail('');
+    setRegPassword('');
+    setIsLoginMode(true);
+  };
+
+  const switchMode = () => {
+    setIsLoginMode(!isLoginMode);
+    setError('');
+    setSuccess('');
+    setShowPassword(false);
   };
 
   const features = [
@@ -83,74 +135,158 @@ export default function UserLogin() {
           })}
         </div>
 
-        {/* Login card */}
-        <div ref={cardRef} className="bg-white dark:bg-stone-800 rounded-2xl border border-stone-200 dark:border-stone-700 p-6 space-y-4 shadow-xl shadow-stone-900/5 dark:shadow-stone-900/30">
-          {existingUsers.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
-                Usuarios existentes
+        {/* Login Card */}
+        <div ref={cardRef} className="bg-white dark:bg-stone-800 rounded-2xl border border-stone-200 dark:border-stone-700 p-6 shadow-xl shadow-stone-900/5 dark:shadow-stone-900/30">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-5">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isLoginMode ? 'bg-indigo-100 dark:bg-indigo-900/30' : 'bg-purple-100 dark:bg-purple-900/30'}`}>
+              {isLoginMode
+                ? <LogIn size={18} className="text-indigo-600 dark:text-indigo-400" />
+                : <UserPlus size={18} className="text-purple-600 dark:text-purple-400" />
+              }
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-stone-900 dark:text-stone-100">
+                {isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta'}
+              </h2>
+              <p className="text-xs text-stone-400 dark:text-stone-500">
+                {isLoginMode ? 'Ingresa tus credenciales' : 'Regístrate para comenzar'}
               </p>
-              {existingUsers.map(({ user }) => (
-                <button
-                  key={user.id}
-                  onClick={() => handleSelectUser(user.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-stone-50 dark:bg-stone-900 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-stone-200 dark:border-stone-700 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all cursor-pointer group"
-                >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center flex-shrink-0">
-                    <User size={18} className="text-indigo-600 dark:text-indigo-400" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-medium text-stone-900 dark:text-stone-100">{user.name}</p>
-                    <p className="text-[11px] text-stone-400 dark:text-stone-500">
-                      Registrado {new Date(user.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                    </p>
-                  </div>
-                  <LogIn size={16} className="text-stone-300 dark:text-stone-600 group-hover:text-indigo-500 transition-colors" />
-                </button>
-              ))}
+            </div>
+          </div>
+
+          {/* Error/Success */}
+          {error && (
+            <div className="mb-4 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-600 dark:text-red-400">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-xs text-green-600 dark:text-green-400">
+              {success}
             </div>
           )}
 
-          {!showNewUser ? (
-            <button
-              onClick={() => setShowNewUser(true)}
-              className="w-full flex items-center justify-center gap-2 py-3.5 border-2 border-dashed border-stone-300 dark:border-stone-600 rounded-xl text-sm font-medium text-stone-600 dark:text-stone-400 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-all cursor-pointer"
-            >
-              <Plus size={16} />
-              {existingUsers.length > 0 ? 'Nuevo usuario' : 'Crear usuario para comenzar'}
-            </button>
-          ) : (
-            <div className="space-y-3 pt-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
-                Nuevo usuario
-              </p>
-              <input
-                type="text"
-                placeholder="¿Cómo te llamas?"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
-                className="w-full px-4 py-3 bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-xl text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setShowNewUser(false); setNewName(''); }}
-                  className="flex-1 py-2.5 text-sm text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleCreateUser}
-                  disabled={!newName.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-stone-300 disabled:to-stone-400 dark:disabled:from-stone-700 dark:disabled:to-stone-600 text-white rounded-xl text-sm font-medium transition-all cursor-pointer disabled:cursor-not-allowed shadow-md shadow-indigo-500/20 disabled:shadow-none"
-                >
-                  <ArrowRight size={16} />
-                  Comenzar
-                </button>
+          {/* Login Form */}
+          {isLoginMode ? (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-stone-500 dark:text-stone-400 mb-1.5">Correo electrónico</label>
+                <div className="relative">
+                  <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="email"
+                    placeholder="tu@email.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                    className="w-full pl-9 pr-4 py-2.5 bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-xl text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+                    autoFocus
+                  />
+                </div>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-stone-500 dark:text-stone-400 mb-1.5">Contraseña</label>
+                <div className="relative">
+                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                    className="w-full pl-9 pr-10 py-2.5 bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-xl text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={handleLogin}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-medium transition-all cursor-pointer shadow-md shadow-indigo-500/20 mt-2"
+              >
+                <ArrowRight size={16} />
+                Ingresar
+              </button>
+            </div>
+          ) : (
+            /* Register Form */
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-stone-500 dark:text-stone-400 mb-1.5">Nombre completo</label>
+                <div className="relative">
+                  <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="text"
+                    placeholder="Tu nombre"
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-xl text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-stone-500 dark:text-stone-400 mb-1.5">Correo electrónico</label>
+                <div className="relative">
+                  <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="email"
+                    placeholder="tu@email.com"
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-xl text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-stone-500 dark:text-stone-400 mb-1.5">Contraseña</label>
+                <div className="relative">
+                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Mínimo 6 caracteres"
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+                    className="w-full pl-9 pr-10 py-2.5 bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-xl text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={handleRegister}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-medium transition-all cursor-pointer shadow-md shadow-indigo-500/20 mt-2"
+              >
+                <UserPlus size={16} />
+                Crear Cuenta
+              </button>
             </div>
           )}
+
+          {/* Switch mode */}
+          <div className="mt-4 pt-4 border-t border-stone-100 dark:border-stone-700 text-center">
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              {isLoginMode ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
+              <button
+                onClick={switchMode}
+                className="ml-1 font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+              >
+                {isLoginMode ? 'Regístrate' : 'Inicia sesión'}
+              </button>
+            </p>
+          </div>
         </div>
 
         {/* Footer */}

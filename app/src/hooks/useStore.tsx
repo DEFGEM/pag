@@ -49,6 +49,22 @@ function initializeState(): AppState {
   const settings = loadFromStorage<AppSettings>(STORAGE_KEY_SETTINGS, getDefaultSettings());
   const importedModules = loadFromStorage<Module[]>(STORAGE_KEY_IMPORTED, []);
 
+  // Ensure admin account exists
+  if (!usersData['admin']) {
+    usersData['admin'] = {
+      user: {
+        id: 'admin',
+        name: 'DEFGEM',
+        email: 'defgem@app.com',
+        password: 'yanhyu190',
+        isAdmin: true,
+        createdAt: new Date().toISOString(),
+      },
+      progress: defaultProgress,
+    };
+    saveToStorage(STORAGE_KEY_USERS, usersData);
+  }
+
   const currentProgress = currentUserId && usersData[currentUserId]
     ? usersData[currentUserId].progress
     : defaultProgress;
@@ -89,7 +105,8 @@ type Action =
   | { type: 'UPDATE_STUDY_TIME'; minutes: number }
   | { type: 'UNLOCK_ACHIEVEMENT'; achievementId: string }
   | { type: 'SET_USER'; userId: string }
-  | { type: 'REGISTER_USER'; userId: string; userName: string }
+  | { type: 'REGISTER_USER'; userId: string; userName: string; email: string; password: string; isAdmin?: boolean }
+  | { type: 'LOGIN_USER'; email: string; password: string }
   | { type: 'LOGOUT' };
 
 function appReducer(state: AppState, action: Action): AppState {
@@ -207,6 +224,9 @@ function appReducer(state: AppState, action: Action): AppState {
           user: {
             id: action.userId,
             name: action.userName,
+            email: action.email,
+            password: action.password,
+            isAdmin: action.isAdmin || false,
             createdAt: new Date().toISOString(),
           },
           progress: defaultProgress,
@@ -217,6 +237,21 @@ function appReducer(state: AppState, action: Action): AppState {
         usersData: newUsersData,
         currentUserId: action.userId,
         userProgress: defaultProgress,
+        isAdmin: action.isAdmin || false,
+      };
+    }
+    case 'LOGIN_USER': {
+      const userEntry = Object.values(state.usersData).find(
+        (u) => u.user.email === action.email && u.user.password === action.password
+      );
+      if (!userEntry) {
+        return state;
+      }
+      return {
+        ...state,
+        currentUserId: userEntry.user.id,
+        userProgress: userEntry.progress,
+        isAdmin: userEntry.user.isAdmin || false,
       };
     }
     case 'LOGOUT': {
@@ -224,6 +259,7 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         currentUserId: null,
         userProgress: defaultProgress,
+        isAdmin: false,
       };
     }
     default:
@@ -255,7 +291,8 @@ interface StoreContextType {
   getModuleProgress: (moduleId: string) => number;
   getOverallProgress: () => number;
   setUser: (userId: string) => void;
-  registerUser: (userId: string, userName: string) => void;
+  registerUser: (userId: string, userName: string, email: string, password: string, isAdmin?: boolean) => void;
+  loginUser: (email: string, password: string) => boolean;
   logout: () => void;
 }
 
@@ -312,9 +349,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_USER', userId });
   }, []);
 
-  const registerUser = useCallback((userId: string, userName: string) => {
-    dispatch({ type: 'REGISTER_USER', userId, userName });
+  const registerUser = useCallback((userId: string, userName: string, email: string, password: string, isAdmin?: boolean) => {
+    dispatch({ type: 'REGISTER_USER', userId, userName, email, password, isAdmin });
   }, []);
+
+  const loginUser = useCallback((email: string, password: string): boolean => {
+    const userEntry = Object.values(state.usersData).find(
+      (u) => u.user.email === email && u.user.password === password
+    );
+    if (userEntry) {
+      dispatch({ type: 'LOGIN_USER', email, password });
+      return true;
+    }
+    return false;
+  }, [state.usersData]);
 
   const logout = useCallback(() => {
     dispatch({ type: 'LOGOUT' });
@@ -332,6 +380,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         getOverallProgress,
         setUser,
         registerUser,
+        loginUser,
         logout,
       }}
     >

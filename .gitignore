@@ -27,3 +27,5 @@ Thumbs.db
 
 # Scratch files
 copilot-session-*.md
+
+/doc
