@@ -1,8 +1,123 @@
 import { useState, useCallback } from 'react';
 import { useStore } from '@/hooks/useStore';
-import { Upload, FileText, X, Loader2, BookOpen, CheckCircle2, Sparkles, FileCode, HelpCircle } from 'lucide-react';
+import { Upload, FileText, X, Loader2, BookOpen, CheckCircle2, Sparkles, FileCode, HelpCircle, File } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import type { Difficulty, Module, Lesson } from '@/types';
+
+async function extractPdfText(file: File): Promise<string> {
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.mjs',
+    import.meta.url
+  ).toString();
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const textParts: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item: any) => item.str).join(' ');
+    if (pageText.trim()) textParts.push(pageText);
+  }
+  return textParts.join('\n\n');
+}
+
+async function extractDocxText(file: File): Promise<string> {
+  const mammoth = await import('mammoth');
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer });
+  return result.value;
+}
+
+function generateQuestionsFromContent(text: string, count: number): any[] {
+  const sentences = text
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 20 && s.length < 300);
+
+  const questions: any[] = [];
+  const usedSentences = new Set<number>();
+
+  for (let i = 0; i < count && sentences.length > 0; i++) {
+    let sentenceIdx = Math.floor(Math.random() * sentences.length);
+    let attempts = 0;
+    while (usedSentences.has(sentenceIdx) && attempts < sentences.length) {
+      sentenceIdx = (sentenceIdx + 1) % sentences.length;
+      attempts++;
+    }
+    usedSentences.add(sentenceIdx);
+
+    const sentence = sentences[sentenceIdx];
+    const words = sentence.split(/\s+/).filter((w) => w.length > 3);
+    const keyWord = words[Math.floor(Math.random() * words.length)] || 'concepto';
+
+    const questionText = `Según el contenido, ¿cuál de las siguientes opciones se relaciona con: "${keyWord.slice(0, 30)}"?`;
+
+    const correctAnswer = sentence.slice(0, 100).trim();
+    const wrongAnswers = [
+      'Esta información no se menciona en el documento.',
+      'No tiene relación con el tema estudiado.',
+      'Es incorrecta según el contenido proporcionado.',
+    ];
+
+    const options = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5);
+    const correctIdx = options.indexOf(correctAnswer);
+
+    questions.push({
+      id: `gen-q-${Date.now()}-${i}`,
+      question: questionText,
+      options: options.map((o) => o.slice(0, 120)),
+      correctAnswer: correctIdx,
+      explanation: `Basado en el contenido del documento: "${sentence.slice(0, 150)}..."`,
+    });
+  }
+
+  if (questions.length === 0) {
+    for (let i = 0; i < count; i++) {
+      questions.push({
+        id: `gen-q-${Date.now()}-${i}`,
+        question: `Pregunta ${i + 1}: ¿Cuál es un concepto clave del contenido importado?`,
+        options: [
+          'Concepto principal del documento',
+          'Elemento no mencionado en el texto',
+          'Dato irrelevante al tema',
+          'Información no encontrada',
+        ],
+        correctAnswer: 0,
+        explanation: 'Respuesta basada en el análisis del contenido del documento.',
+      });
+    }
+  }
+
+  return questions;
+}
+
+function splitTextIntoLessons(text: string, count: number): { title: string; content: string }[] {
+  const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 30);
+  const lessons: { title: string; content: string }[] = [];
+  const perLesson = Math.max(1, Math.ceil(paragraphs.length / count));
+
+  const topicKeywords = [
+    'Introducción', 'Conceptos Básicos', 'Configuración', 'Desarrollo',
+    'Componentes', 'Ejemplos', 'Práctica', 'Avanzado', 'Optimización',
+    'Conclusión', 'Referencias', 'Anexos',
+  ];
+
+  for (let i = 0; i < count; i++) {
+    const start = i * perLesson;
+    const end = Math.min(start + perLesson, paragraphs.length);
+    const lessonParagraphs = paragraphs.slice(start, end);
+
+    if (lessonParagraphs.length === 0) break;
+
+    const title = `Lección ${i + 1}: ${topicKeywords[i % topicKeywords.length]}`;
+    const content = lessonParagraphs.join('\n\n');
+
+    lessons.push({ title, content });
+  }
+
+  return lessons;
+}
 
 export default function ImportContent() {
   const { state, dispatch, addNotification } = useStore();
@@ -13,13 +128,24 @@ export default function ImportContent() {
   const [moduleName, setModuleName] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('basico');
   const [lessonCount, setLessonCount] = useState([6]);
+  const [questionCount, setQuestionCount] = useState([8]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
   const [generatedModule, setGeneratedModule] = useState<Module | null>(null);
 
   const isValidFile = (f: File) => {
-    return ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'].includes(f.type) ||
-      f.name.endsWith('.pdf') || f.name.endsWith('.docx') || f.name.endsWith('.txt');
+    return (
+      f.name.endsWith('.pdf') ||
+      f.name.endsWith('.docx') ||
+      f.name.endsWith('.txt') ||
+      f.name.endsWith('.md')
+    );
+  };
+
+  const getFileIcon = (fileName: string) => {
+    if (fileName.endsWith('.pdf')) return '📄';
+    if (fileName.endsWith('.docx')) return '📝';
+    return '📃';
   };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -32,20 +158,23 @@ export default function ImportContent() {
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files?.[0]) {
-      const droppedFile = e.dataTransfer.files[0];
-      if (isValidFile(droppedFile)) {
-        setFile(droppedFile);
-        setModuleName(droppedFile.name.replace(/\.[^/.]+$/, ''));
-      } else {
-        addNotification('error', 'Formato de archivo no soportado. Usa TXT, PDF o DOCX.');
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragActive(false);
+      if (e.dataTransfer.files?.[0]) {
+        const droppedFile = e.dataTransfer.files[0];
+        if (isValidFile(droppedFile)) {
+          setFile(droppedFile);
+          setModuleName(droppedFile.name.replace(/\.[^/.]+$/, ''));
+        } else {
+          addNotification('error', 'Formato no soportado. Usa PDF, DOCX o TXT.');
+        }
       }
-    }
-  }, [addNotification]);
+    },
+    [addNotification]
+  );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
@@ -54,230 +183,9 @@ export default function ImportContent() {
         setFile(selectedFile);
         setModuleName(selectedFile.name.replace(/\.[^/.]+$/, ''));
       } else {
-        addNotification('error', 'Formato de archivo no soportado. Usa TXT, PDF o DOCX.');
+        addNotification('error', 'Formato no soportado. Usa PDF, DOCX o TXT.');
       }
     }
-  };
-
-  const parseTextContent = (text: string, titleName: string): Module => {
-    const lines = text.split('\n');
-    let title = titleName;
-    let parsedDifficulty = difficulty;
-    let currentLessonTitle = '';
-    let currentLessonDuration = 15;
-    let currentLessonContent = '';
-    let currentLessonSummary = '';
-    const lessons: Lesson[] = [];
-    const questions: any[] = [];
-    
-    let inContent = false;
-    let inSummary = false;
-    
-    // Heuristic parser
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-      
-      if (line.toLowerCase().startsWith('módulo:') || line.toLowerCase().startsWith('modulo:')) {
-        title = line.substring(7).trim();
-      } else if (line.toLowerCase().startsWith('dificultad:')) {
-        const diffVal = line.substring(11).trim().toLowerCase();
-        if (['basico', 'intermedio', 'avanzado'].includes(diffVal)) {
-          parsedDifficulty = diffVal as Difficulty;
-        }
-      } else if (line.toLowerCase().startsWith('lección') || line.toLowerCase().startsWith('leccion')) {
-        // Save previous lesson if any
-        if (currentLessonTitle) {
-          lessons.push({
-            id: `imported-lesson-${Date.now()}-${lessons.length}`,
-            moduleId: `imported-mod-${Date.now()}`,
-            title: currentLessonTitle,
-            description: currentLessonSummary.substring(0, 150).replace(/•/g, '').trim() || `Conceptos sobre ${currentLessonTitle}.`,
-            duration: currentLessonDuration,
-            order: lessons.length + 1,
-            content: [
-              { type: 'text', content: currentLessonContent || `Contenido de la lección ${currentLessonTitle}.` },
-              { type: 'summary', content: currentLessonSummary || `• Resumen de ${currentLessonTitle}` }
-            ]
-          });
-        }
-        currentLessonTitle = line.replace(/^lecci[oó]n\s*\d*:\s*/i, '').trim();
-        currentLessonDuration = 15 + Math.floor(Math.random() * 15);
-        currentLessonContent = '';
-        currentLessonSummary = '';
-        inContent = false;
-        inSummary = false;
-      } else if (line.toLowerCase().startsWith('duración:') || line.toLowerCase().startsWith('duracion:')) {
-        const dur = parseInt(line.replace(/[^0-9]/g, ''));
-        if (!isNaN(dur)) currentLessonDuration = dur;
-      } else if (line.toLowerCase().startsWith('contenido:')) {
-        inContent = true;
-        inSummary = false;
-      } else if (line.toLowerCase().startsWith('resumen:')) {
-        inContent = false;
-        inSummary = true;
-      } else if (line === '---') {
-        inContent = false;
-        inSummary = false;
-      } else if (inContent) {
-        currentLessonContent += (currentLessonContent ? '\n' : '') + line;
-      } else if (inSummary) {
-        currentLessonSummary += (currentLessonSummary ? '\n' : '') + line;
-      }
-    }
-    
-    // Push last lesson
-    if (currentLessonTitle) {
-      lessons.push({
-        id: `imported-lesson-${Date.now()}-${lessons.length}`,
-        moduleId: `imported-mod-${Date.now()}`,
-        title: currentLessonTitle,
-        description: currentLessonSummary.substring(0, 150).replace(/•/g, '').trim() || `Conceptos sobre ${currentLessonTitle}.`,
-        duration: currentLessonDuration,
-        order: lessons.length + 1,
-        content: [
-          { type: 'text', content: currentLessonContent || `Contenido de la lección ${currentLessonTitle}.` },
-          { type: 'summary', content: currentLessonSummary || `• Resumen de ${currentLessonTitle}` }
-        ]
-      });
-    }
-
-    // Parse questions from bottom if structured
-    let currentQuestionText = '';
-    let currentOptions: string[] = [];
-    let currentCorrectAnswer = 0;
-    let currentExplanation = '';
-    let inQuestion = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      if (/^[0-9]+\.\s*(.*)/.test(line)) {
-        if (currentQuestionText && currentOptions.length > 0) {
-          questions.push({
-            id: `imported-q-${Date.now()}-${questions.length}`,
-            question: currentQuestionText,
-            options: currentOptions,
-            correctAnswer: currentCorrectAnswer,
-            explanation: currentExplanation || 'Respuesta correcta basada en el contenido.'
-          });
-        }
-        const match = line.match(/^[0-9]+\.\s*(.*)/);
-        currentQuestionText = match ? match[1] : line;
-        currentOptions = [];
-        currentCorrectAnswer = 0;
-        currentExplanation = '';
-        inQuestion = true;
-      } else if (inQuestion && /^[a-d]\)\s*(.*)/i.test(line)) {
-        const match = line.match(/^[a-d]\)\s*(.*)/i);
-        if (match) currentOptions.push(match[1]);
-      } else if (inQuestion && (line.toLowerCase().startsWith('respuesta:') || line.toLowerCase().startsWith('correcto:'))) {
-        const ans = line.replace(/^(respuesta|correcto):\s*/i, '').trim().toLowerCase();
-        if (ans === 'a' || ans.startsWith('a)')) currentCorrectAnswer = 0;
-        else if (ans === 'b' || ans.startsWith('b)')) currentCorrectAnswer = 1;
-        else if (ans === 'c' || ans.startsWith('c)')) currentCorrectAnswer = 2;
-        else if (ans === 'd' || ans.startsWith('d)')) currentCorrectAnswer = 3;
-        else {
-          const num = parseInt(ans);
-          if (!isNaN(num)) currentCorrectAnswer = num - 1;
-        }
-      } else if (inQuestion && line.toLowerCase().startsWith('explicación:')) {
-        currentExplanation = line.substring(12).trim();
-      }
-    }
-
-    // Push last question
-    if (currentQuestionText && currentOptions.length > 0) {
-      questions.push({
-        id: `imported-q-${Date.now()}-${questions.length}`,
-        question: currentQuestionText,
-        options: currentOptions,
-        correctAnswer: currentCorrectAnswer,
-        explanation: currentExplanation || 'Respuesta correcta basada en el contenido.'
-      });
-    }
-
-    // Fallback/Standard generator if no structured lessons were parsed
-    if (lessons.length === 0) {
-      const words = text.split(/\s+/).filter(w => w.length > 0);
-      const targetCount = lessonCount[0];
-      const wordsPerLesson = Math.max(50, Math.ceil(words.length / targetCount));
-      
-      const topics = [
-        'Introducción y Conceptos Básicos',
-        'Configuración de Entorno',
-        'Componentes Core de React Native',
-        'Props, State y Ciclo de vida',
-        'Estilos y Flexbox Layout',
-        'Manejo de Eventos y Formularios',
-        'Consumo de API Fetch/Axios',
-        'Persistencia de Datos con AsyncStorage',
-        'Buenas Prácticas y Rendimiento'
-      ];
-
-      for (let i = 0; i < targetCount; i++) {
-        const sliceStart = i * wordsPerLesson;
-        const sliceEnd = Math.min(sliceStart + wordsPerLesson, words.length);
-        const lessonWords = words.slice(sliceStart, sliceEnd);
-        if (lessonWords.length === 0) break;
-        
-        const lessonText = lessonWords.join(' ');
-        const topic = topics[i % topics.length];
-        lessons.push({
-          id: `imported-lesson-${Date.now()}-${i}`,
-          moduleId: `imported-mod-${Date.now()}`,
-          title: `Lección ${i + 1}: ${topic}`,
-          description: `Conceptos fundamentales y ejemplos sobre ${topic.toLowerCase()}.`,
-          duration: 12 + Math.floor(Math.random() * 10),
-          order: i + 1,
-          content: [
-            { type: 'text', content: lessonText },
-            { type: 'summary', content: `• Conceptos clave de ${topic}\n• Aplicación práctica directa en tu proyecto` }
-          ]
-        });
-      }
-    }
-
-    // Fallback questions if none parsed
-    if (questions.length === 0) {
-      questions.push(
-        {
-          id: `imported-q-${Date.now()}-1`,
-          question: `¿Cuál es el tema central abordado en este módulo?`,
-          options: ['Los fundamentos de desarrollo en React Native', 'La programación de servidores web', 'El diseño de bases de datos relacionales', 'La administración de sistemas operativos'],
-          correctAnswer: 0,
-          explanation: 'El módulo aborda de forma práctica los conceptos de desarrollo móvil en React Native.',
-        },
-        {
-          id: `imported-q-${Date.now()}-2`,
-          question: '¿Qué ventaja principal ofrece React Native?',
-          options: ['Desarrollo multiplataforma con una única base de código', 'Compilación directa a código ensamblador puro', 'Mayor consumo de memoria que las apps web', 'Es exclusivo de plataformas Android'],
-          correctAnswer: 0,
-          explanation: 'Permite compilar a componentes nativos en iOS y Android compartiendo la lógica de JavaScript.',
-        }
-      );
-    }
-
-    const moduleId = `imported-mod-${Date.now()}`;
-    return {
-      id: moduleId,
-      title,
-      description: `Módulo generado automáticamente.`,
-      difficulty: parsedDifficulty,
-      thumbnail: '/images/module-advanced.jpg',
-      estimatedHours: Math.ceil(lessons.reduce((acc, l) => acc + l.duration, 0) / 60),
-      order: state.modules.length + 1,
-      category: 'Personalizado',
-      lessons: lessons.map(l => ({ ...l, moduleId })),
-      quiz: {
-        id: `quiz-${moduleId}`,
-        moduleId,
-        title: `Evaluación: ${title}`,
-        passingScore: 70,
-        questions
-      }
-    };
   };
 
   const handleGenerate = useCallback(async () => {
@@ -288,14 +196,19 @@ export default function ImportContent() {
       setIsProcessing(true);
       setProcessingStep(0);
 
-      // Read text file
       try {
-        rawText = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve((e.target?.result as string) || '');
-          reader.onerror = () => reject(new Error('Error al leer archivo'));
-          reader.readAsText(file);
-        });
+        if (file.name.endsWith('.pdf')) {
+          rawText = await extractPdfText(file);
+        } else if (file.name.endsWith('.docx')) {
+          rawText = await extractDocxText(file);
+        } else {
+          rawText = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve((e.target?.result as string) || '');
+            reader.onerror = () => reject(new Error('Error al leer archivo'));
+            reader.readAsText(file);
+          });
+        }
       } catch (err) {
         addNotification('error', 'Error al leer el archivo. Inténtalo de nuevo.');
         setIsProcessing(false);
@@ -308,24 +221,56 @@ export default function ImportContent() {
       rawText = pastedText;
     }
 
-    // Simulate AI extraction phases
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 800));
     setProcessingStep(1);
-    await new Promise((r) => setTimeout(r, 1200));
-    setProcessingStep(2);
     await new Promise((r) => setTimeout(r, 1000));
+    setProcessingStep(2);
 
-    const newModule = parseTextContent(rawText, moduleName);
+    const lessonsData = splitTextIntoLessons(rawText, lessonCount[0]);
+    const questions = generateQuestionsFromContent(rawText, questionCount[0]);
+
+    const moduleId = `imported-mod-${Date.now()}`;
+    const lessons: Lesson[] = lessonsData.map((l, i) => ({
+      id: `imported-lesson-${Date.now()}-${i}`,
+      moduleId,
+      title: l.title,
+      description: l.content.slice(0, 150).trim() + '...',
+      duration: 10 + Math.floor(Math.random() * 15),
+      order: i + 1,
+      content: [
+        { type: 'text', content: l.content },
+        { type: 'summary', content: `• Resumen de ${l.title}\n• Conceptos clave del documento` },
+      ],
+    }));
+
+    const newModule: Module = {
+      id: moduleId,
+      title: moduleName,
+      description: `Módulo generado desde ${file?.name || 'texto pegado'}. Contiene ${lessons.length} lecciones y ${questions.length} preguntas.`,
+      difficulty,
+      thumbnail: '/images/module-advanced.jpg',
+      estimatedHours: Math.ceil(lessons.reduce((acc, l) => acc + l.duration, 0) / 60),
+      order: state.modules.length + 1,
+      category: 'Personalizado',
+      lessons,
+      quiz: {
+        id: `quiz-${moduleId}`,
+        moduleId,
+        title: `Evaluación: ${moduleName}`,
+        passingScore: 70,
+        questions,
+      },
+    };
 
     setGeneratedModule(newModule);
     setIsProcessing(false);
-    addNotification('success', 'Módulo generado exitosamente ✅');
-  }, [file, moduleName, lessonCount, difficulty, activeTab, pastedText, addNotification]);
+    addNotification('success', 'Módulo generado exitosamente');
+  }, [file, moduleName, lessonCount, questionCount, difficulty, activeTab, pastedText, addNotification, state.modules.length]);
 
   const handleSave = () => {
     if (generatedModule) {
       dispatch({ type: 'ADD_IMPORTED_MODULE', module: generatedModule });
-      addNotification('success', 'Módulo guardado en "Mis Módulos" 📚');
+      addNotification('success', 'Módulo guardado en "Mis Módulos"');
       setGeneratedModule(null);
       setFile(null);
       setPastedText('');
@@ -333,59 +278,10 @@ export default function ImportContent() {
     }
   };
 
-  const downloadTemplate = () => {
-    const template = `Módulo: React Native Interactivo
-Dificultad: Intermedio
-
-Lección 1: Primer Componente
-Duración: 15
-Contenido:
-En React Native, construimos la UI usando componentes declarativos. Los componentes principales son View, Text, Image, TextInput y ScrollView.
-Usa estilos a través de StyleSheet para aplicar diseño Flexbox.
----
-Resumen:
-• View es el equivalente a div en la web.
-• Text se requiere para cualquier string de texto.
-
-Lección 2: Navegación Stack
-Duración: 20
-Contenido:
-React Navigation es la biblioteca estándar de facto para navegación. Stack Navigator te permite apilar pantallas.
----
-Resumen:
-• Stack Navigator maneja historial de pantallas.
-• Permite animaciones de transición nativas.
-
-Examen:
-1. ¿Qué componente se usa para envolver texto en React Native?
-a) View
-b) Text
-c) Paragraph
-d) Label
-Respuesta: b
-Explicación: React Native requiere que todo texto esté dentro de un componente <Text>.
-
-2. ¿Cuál es la biblioteca estándar para navegación en React Native?
-a) React Router Dom
-b) React Navigation
-c) Navigation Mobile
-d) Expo Router Only
-Respuesta: b
-Explicación: React Navigation es la solución estándar más popular para navegación.`;
-
-    const blob = new Blob([template], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'plantilla_curso_rn.txt';
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const processingSteps = [
-    { label: 'Analizando contenido...', icon: FileText },
-    { label: 'Generando lecciones e interactividad...', icon: Sparkles },
-    { label: 'Estructurando evaluaciones de aprendizaje...', icon: BookOpen },
+    { label: 'Extrayendo texto del documento...', icon: FileText },
+    { label: 'Generando lecciones...', icon: Sparkles },
+    { label: 'Creando preguntas de evaluación...', icon: HelpCircle },
   ];
 
   return (
@@ -393,10 +289,10 @@ Explicación: React Navigation es la solución estándar más popular para naveg
       <div className="mb-6">
         <h2 className="text-2xl font-medium text-stone-900 dark:text-stone-100 flex items-center gap-2">
           <Sparkles className="text-indigo-500 animate-pulse" size={24} />
-          Generador de Cursos con IA
+          Importar Contenido
         </h2>
         <p className="text-stone-600 dark:text-stone-400 mt-1">
-          Sube tus notas, libros o documentación y crea un módulo interactivo completo con lecciones y exámenes de opción múltiple de forma instantánea.
+          Sube un archivo PDF, Word o TXT y genera automáticamente un módulo con lecciones y evaluación.
         </p>
       </div>
 
@@ -422,12 +318,11 @@ Explicación: React Navigation es la solución estándar más popular para naveg
                   : 'border-transparent text-stone-500 hover:text-stone-700 dark:text-stone-400'
               }`}
             >
-              Pegar Texto Manual
+              Pegar Texto
             </button>
           </div>
 
           {activeTab === 'upload' ? (
-            /* Dropzone */
             <div className="space-y-3">
               {!file ? (
                 <div
@@ -435,14 +330,11 @@ Explicación: React Navigation es la solución estándar más popular para naveg
                   onDragLeave={handleDrag}
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
-                  className={`
-                    border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-200 cursor-pointer
-                    ${
-                      dragActive
-                        ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
-                        : 'border-stone-300 dark:border-stone-700 hover:border-indigo-400 dark:hover:border-indigo-600'
-                    }
-                  `}
+                  className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-200 cursor-pointer ${
+                    dragActive
+                      ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
+                      : 'border-stone-300 dark:border-stone-700 hover:border-indigo-400 dark:hover:border-indigo-600'
+                  }`}
                 >
                   <Upload size={48} className="mx-auto text-stone-400 dark:text-stone-500 mb-4" />
                   <p className="text-stone-700 dark:text-stone-300 font-medium">
@@ -451,23 +343,31 @@ Explicación: React Navigation es la solución estándar más popular para naveg
                       selecciona de tu equipo
                       <input
                         type="file"
-                        accept=".txt"
+                        accept=".pdf,.docx,.txt,.md"
                         className="hidden"
                         onChange={handleFileSelect}
                       />
                     </label>
                   </p>
-                  <p className="text-xs text-stone-500 dark:text-stone-500 mt-2">
-                    Formatos soportados: TXT (Recomendado)
-                  </p>
+                  <div className="flex justify-center gap-4 mt-4">
+                    <span className="flex items-center gap-1 text-xs text-stone-500">
+                      <File size={14} /> PDF
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-stone-500">
+                      <FileText size={14} /> DOCX
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-stone-500">
+                      <FileCode size={14} /> TXT
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-4 p-4 bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 shadow-sm">
-                  <FileText size={24} className="text-indigo-500 flex-shrink-0" />
+                  <span className="text-2xl">{getFileIcon(file.name)}</span>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-stone-900 dark:text-stone-100 truncate">{file.name}</p>
                     <p className="text-xs text-stone-400 dark:text-stone-500">
-                      {(file.size / 1024).toFixed(1)} KB · Archivo listo para importar
+                      {(file.size / 1024).toFixed(1)} KB · {file.name.split('.').pop()?.toUpperCase()}
                     </p>
                   </div>
                   <button
@@ -478,26 +378,8 @@ Explicación: React Navigation es la solución estándar más popular para naveg
                   </button>
                 </div>
               )}
-
-              {/* Template Download Option */}
-              <div className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-xl border border-indigo-100/50 dark:border-indigo-900/30">
-                <div className="flex items-center gap-2.5">
-                  <FileCode size={18} className="text-indigo-500" />
-                  <div className="text-left">
-                    <p className="text-xs font-semibold text-indigo-950 dark:text-indigo-200">¿Quieres crear lecciones estructuradas?</p>
-                    <p className="text-[11px] text-indigo-700/80 dark:text-indigo-400/80">Descarga la plantilla estructurada para importar cursos completos.</p>
-                  </div>
-                </div>
-                <button
-                  onClick={downloadTemplate}
-                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-medium rounded-lg transition-colors cursor-pointer"
-                >
-                  Descargar plantilla
-                </button>
-              </div>
             </div>
           ) : (
-            /* Text Area Paste */
             <div className="space-y-2">
               <label className="block text-sm font-medium text-stone-700 dark:text-stone-300">
                 Contenido del curso
@@ -505,7 +387,7 @@ Explicación: React Navigation es la solución estándar más popular para naveg
               <textarea
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value)}
-                placeholder="Pega aquí el contenido de tus notas, documentación técnica o resúmenes..."
+                placeholder="Pega aquí el contenido de tus notas, documentación o resúmenes..."
                 rows={8}
                 className="w-full px-4 py-3 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
               />
@@ -515,7 +397,7 @@ Explicación: React Navigation es la solución estándar más popular para naveg
           {/* Configuration */}
           {((activeTab === 'upload' && file) || (activeTab === 'paste' && pastedText.trim())) && !isProcessing && (
             <div className="bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 p-6 space-y-5 shadow-sm">
-              <h3 className="font-semibold text-stone-900 dark:text-stone-100 text-sm">Ajustes del curso</h3>
+              <h3 className="font-semibold text-stone-900 dark:text-stone-100 text-sm">Configuración del módulo</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -526,28 +408,25 @@ Explicación: React Navigation es la solución estándar más popular para naveg
                     type="text"
                     value={moduleName}
                     onChange={(e) => setModuleName(e.target.value)}
-                    placeholder="Ej. Navegación Avanzada"
+                    placeholder="Ej. Introducción a React"
                     className="w-full px-4 py-2.5 bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs text-stone-600 dark:text-stone-400 mb-1.5 uppercase font-semibold tracking-wider">
-                    Nivel de dificultad
+                    Dificultad
                   </label>
                   <div className="flex gap-2">
                     {(['basico', 'intermedio', 'avanzado'] as Difficulty[]).map((d) => (
                       <button
                         key={d}
                         onClick={() => setDifficulty(d)}
-                        className={`
-                          flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer uppercase tracking-wider
-                          ${
-                            difficulty === d
-                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                              : 'bg-stone-100 dark:bg-stone-900 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700'
-                          }
-                        `}
+                        className={`flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer uppercase tracking-wider ${
+                          difficulty === d
+                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                            : 'bg-stone-100 dark:bg-stone-900 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700'
+                        }`}
                       >
                         {d}
                       </button>
@@ -556,10 +435,10 @@ Explicación: React Navigation es la solución estándar más popular para naveg
                 </div>
               </div>
 
-              {!file && activeTab === 'paste' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-stone-600 dark:text-stone-400 mb-2 uppercase font-semibold tracking-wider">
-                    Número de lecciones estimadas: {lessonCount[0]}
+                    Lecciones: {lessonCount[0]}
                   </label>
                   <Slider
                     value={lessonCount}
@@ -570,7 +449,21 @@ Explicación: React Navigation es la solución estándar más popular para naveg
                     className="w-full"
                   />
                 </div>
-              )}
+
+                <div>
+                  <label className="block text-xs text-stone-600 dark:text-stone-400 mb-2 uppercase font-semibold tracking-wider">
+                    Preguntas de evaluación: {questionCount[0]}
+                  </label>
+                  <Slider
+                    value={questionCount}
+                    onValueChange={setQuestionCount}
+                    min={3}
+                    max={20}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+              </div>
 
               <button
                 onClick={handleGenerate}
@@ -578,7 +471,7 @@ Explicación: React Navigation es la solución estándar más popular para naveg
                 className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-stone-300 disabled:to-stone-400 dark:disabled:from-stone-700 dark:disabled:to-stone-600 text-white rounded-xl font-semibold transition-all cursor-pointer disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
               >
                 <Sparkles size={18} />
-                Generar Curso con AI
+                Generar Módulo
               </button>
             </div>
           )}
@@ -638,7 +531,7 @@ Explicación: React Navigation es la solución estándar más popular para naveg
               {generatedModule.lessons.map((lesson: Lesson, i: number) => (
                 <div
                   key={lesson.id}
-                  className="flex items-center justify-between py-2.5 px-4 bg-stone-50 dark:bg-stone-900/50 rounded-xl border border-stone-100 dark:border-stone-850 hover:bg-stone-100 transition-colors"
+                  className="flex items-center justify-between py-2.5 px-4 bg-stone-50 dark:bg-stone-900/50 rounded-xl border border-stone-100 dark:border-stone-800 hover:bg-stone-100 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-xs text-stone-400 font-mono w-5">{String(i + 1).padStart(2, '0')}</span>
@@ -651,24 +544,24 @@ Explicación: React Navigation es la solución estándar más popular para naveg
 
             {/* Quiz Preview */}
             <div className="mt-5 pt-4 border-t border-stone-200 dark:border-stone-800">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-550 mb-3 flex items-center gap-1.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-3 flex items-center gap-1.5">
                 <HelpCircle size={14} />
-                Evaluación Generada ({generatedModule.quiz.questions.length} preguntas)
+                Evaluación ({generatedModule.quiz.questions.length} preguntas)
               </h4>
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
                 {generatedModule.quiz.questions.map((q: any, i: number) => (
-                  <div key={q.id} className="p-3 bg-stone-50/50 dark:bg-stone-900/30 rounded-xl border border-stone-100 dark:border-stone-800/40 text-left">
+                  <div key={q.id} className="p-3 bg-stone-50/50 dark:bg-stone-900/30 rounded-xl border border-stone-100 dark:border-stone-800/40">
                     <p className="text-xs font-medium text-stone-800 dark:text-stone-200">
                       {i + 1}. {q.question}
                     </p>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="grid grid-cols-1 gap-1.5 mt-2">
                       {q.options.map((opt: string, idx: number) => (
                         <div
                           key={idx}
-                          className={`text-[11px] px-2 py-1 rounded border ${
+                          className={`text-[11px] px-2.5 py-1.5 rounded border ${
                             idx === q.correctAnswer
                               ? 'bg-teal-50 border-teal-200 text-teal-700 dark:bg-teal-900/20 dark:border-teal-800/40 dark:text-teal-400 font-medium'
-                              : 'bg-white border-stone-100 text-stone-505 dark:bg-stone-900 dark:border-stone-800'
+                              : 'bg-white border-stone-100 text-stone-500 dark:bg-stone-900 dark:border-stone-800'
                           }`}
                         >
                           {String.fromCharCode(97 + idx)}) {opt}
