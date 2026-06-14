@@ -159,23 +159,54 @@ export default function Quiz() {
 
           {/* Question Review */}
           <div className="text-left bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 p-5">
-            <h4 className="font-medium text-stone-900 dark:text-stone-100 mb-3">Revisión</h4>
-            <div className="space-y-2">
+            <h4 className="font-medium text-stone-900 dark:text-stone-100 mb-3">Revisión Detallada</h4>
+            <div className="space-y-4">
               {quiz.questions.map((q, i) => {
                 const correct = selectedAnswers[q.id] === q.correctAnswer;
+                const userAnswer = selectedAnswers[q.id];
                 return (
-                  <div key={q.id} className="flex items-center gap-3 py-2 border-b border-stone-100 dark:border-stone-700/50 last:border-0">
-                    {correct ? (
-                      <CheckCircle2 size={18} className="text-teal-500 flex-shrink-0" />
-                    ) : (
-                      <XCircle size={18} className="text-rose-500 flex-shrink-0" />
+                  <div key={q.id} className="p-3 rounded-lg bg-stone-50 dark:bg-stone-900/50 border border-stone-100 dark:border-stone-700/50">
+                    <div className="flex items-center gap-3 mb-2">
+                      {correct ? (
+                        <CheckCircle2 size={18} className="text-teal-500 flex-shrink-0" />
+                      ) : (
+                        <XCircle size={18} className="text-rose-500 flex-shrink-0" />
+                      )}
+                      <span className="text-sm font-medium text-stone-900 dark:text-stone-100 flex-1">
+                        Pregunta {i + 1}: {q.question}
+                      </span>
+                      <span className={`text-xs font-medium ${correct ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {correct ? 'Correcta' : 'Incorrecta'}
+                      </span>
+                    </div>
+
+                    {/* Show user's answer if wrong */}
+                    {!correct && userAnswer !== undefined && (
+                      <div className="ml-7 mb-2">
+                        <p className="text-xs text-stone-500 dark:text-stone-400 mb-1">Tu respuesta:</p>
+                        <p className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800/40">
+                          {optionLabels[userAnswer]}. {q.options[userAnswer]}
+                        </p>
+                      </div>
                     )}
-                    <span className="text-sm text-stone-700 dark:text-stone-300 flex-1">
-                      Pregunta {i + 1}
-                    </span>
-                    <span className={`text-xs font-medium ${correct ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                      {correct ? 'Correcta' : 'Incorrecta'}
-                    </span>
+
+                    {/* Show correct answer */}
+                    {!correct && (
+                      <div className="ml-7 mb-2">
+                        <p className="text-xs text-stone-500 dark:text-stone-400 mb-1">Respuesta correcta:</p>
+                        <p className="text-sm text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 px-3 py-1.5 rounded-lg border border-teal-200 dark:border-teal-800/40">
+                          {optionLabels[q.correctAnswer]}. {q.options[q.correctAnswer]}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Explanation */}
+                    <div className="ml-7 mt-2">
+                      <p className="text-xs text-stone-500 dark:text-stone-400 mb-1">Explicación:</p>
+                      <p className="text-sm text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-3 py-2 rounded-lg">
+                        {q.explanation}
+                      </p>
+                    </div>
                   </div>
                 );
               })}

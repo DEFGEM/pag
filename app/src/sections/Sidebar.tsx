@@ -21,6 +21,7 @@ import {
   Shield,
   Sparkles,
   Code,
+  UserCircle,
 } from 'lucide-react';
 
 const mainNavItems = [
@@ -29,6 +30,7 @@ const mainNavItems = [
   { label: 'Playground', path: '/playground', icon: Code },
   { label: 'Evaluaciones', path: '/evaluations', icon: ClipboardCheck },
   { label: 'Logros', path: '/achievements', icon: Trophy },
+  { label: 'Mi Perfil', path: '/profile', icon: UserCircle },
 ];
 
 const adminNavItems = [
