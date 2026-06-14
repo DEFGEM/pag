@@ -54,7 +54,7 @@ function initializeState(): AppState {
     : defaultProgress;
 
   return {
-    modules,
+    modules: [...modules, ...importedModules],
     userProgress: currentProgress,
     achievements,
     usersData,
@@ -84,6 +84,7 @@ type Action =
   | { type: 'TOGGLE_DARK_MODE' }
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'ADD_IMPORTED_MODULE'; module: Module }
+  | { type: 'DELETE_IMPORTED_MODULE'; moduleId: string }
   | { type: 'TOGGLE_ADMIN' }
   | { type: 'UPDATE_STUDY_TIME'; minutes: number }
   | { type: 'UNLOCK_ACHIEVEMENT'; achievementId: string }
@@ -156,9 +157,19 @@ function appReducer(state: AppState, action: Action): AppState {
       return { ...state, sidebarOpen: !state.sidebarOpen };
     }
     case 'ADD_IMPORTED_MODULE': {
+      const updatedImported = [...state.importedModules, action.module];
       return {
         ...state,
-        importedModules: [...state.importedModules, action.module],
+        importedModules: updatedImported,
+        modules: [...modules, ...updatedImported],
+      };
+    }
+    case 'DELETE_IMPORTED_MODULE': {
+      const updatedImported = state.importedModules.filter((m) => m.id !== action.moduleId);
+      return {
+        ...state,
+        importedModules: updatedImported,
+        modules: [...modules, ...updatedImported],
       };
     }
     case 'TOGGLE_ADMIN': {

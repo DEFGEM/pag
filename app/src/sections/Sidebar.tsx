@@ -18,6 +18,8 @@ import {
   Menu,
   X,
   LogOut,
+  Shield,
+  Sparkles,
 } from 'lucide-react';
 
 const mainNavItems = [
@@ -35,11 +37,12 @@ const adminNavItems = [
 ];
 
 export default function Sidebar() {
-  const { state, dispatch, logout } = useStore();
+  const { state, dispatch, logout, getOverallProgress } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const { darkMode, sidebarOpen, isAdmin, currentUserId, usersData } = state;
   const currentUser = currentUserId ? usersData[currentUserId]?.user : null;
+  const overallProgress = getOverallProgress();
 
   const toggleDarkMode = () => dispatch({ type: 'TOGGLE_DARK_MODE' });
   const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
@@ -52,11 +55,11 @@ export default function Sidebar() {
   const navItemClass = (path: string) => {
     const active = isActive(path);
     return `
-      flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium
-      transition-all duration-200 cursor-pointer select-none
+      flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium
+      transition-all duration-200 cursor-pointer select-none group/item
       ${
         active
-          ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+          ? 'bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 dark:from-indigo-900/40 dark:to-purple-900/30 dark:text-indigo-300 shadow-sm'
           : 'text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800/60'
       }
     `;
@@ -64,6 +67,7 @@ export default function Sidebar() {
 
   const renderNavItem = (item: typeof mainNavItems[0]) => {
     const Icon = item.icon;
+    const active = isActive(item.path);
     return (
       <button
         key={item.path}
@@ -75,8 +79,15 @@ export default function Sidebar() {
           }
         }}
       >
-        <Icon size={20} strokeWidth={1.8} />
+        <Icon
+          size={20}
+          strokeWidth={1.8}
+          className={active ? 'text-indigo-600 dark:text-indigo-400' : 'group-hover/item:text-indigo-500 transition-colors'}
+        />
         <span className={`${!sidebarOpen ? 'hidden' : ''}`}>{item.label}</span>
+        {active && sidebarOpen && (
+          <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500" />
+        )}
       </button>
     );
   };
@@ -86,7 +97,7 @@ export default function Sidebar() {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
           onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
         />
       )}
@@ -95,7 +106,7 @@ export default function Sidebar() {
       <button
         onClick={toggleSidebar}
         aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
-        className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-white dark:bg-stone-800 shadow-md md:hidden"
+        className="fixed top-4 left-4 z-50 p-2.5 rounded-xl bg-white dark:bg-stone-800 shadow-lg border border-stone-200 dark:border-stone-700 md:hidden"
       >
         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
@@ -112,14 +123,18 @@ export default function Sidebar() {
       >
         {/* Logo */}
         <div className={`flex items-center gap-3 px-5 py-5 border-b border-stone-200 dark:border-stone-800 ${!sidebarOpen ? 'justify-center px-2' : ''}`}>
-          <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/25">
             <Atom size={20} className="text-white" />
           </div>
           {sidebarOpen && (
-            <span className="font-medium text-stone-900 dark:text-stone-100 text-[15px] leading-tight truncate">
-              React Native<br />
-              <span className="text-stone-500 dark:text-stone-400 text-[13px]">desde Cero</span>
-            </span>
+            <div>
+              <span className="font-bold text-stone-900 dark:text-stone-100 text-[15px] leading-tight block">
+                RN Academy
+              </span>
+              <span className="text-stone-400 dark:text-stone-500 text-[11px] flex items-center gap-1">
+                <Sparkles size={10} /> Desde Cero
+              </span>
+            </div>
           )}
         </div>
 
@@ -131,7 +146,8 @@ export default function Sidebar() {
             <>
               {sidebarOpen && (
                 <div className="pt-4 pb-2 px-4">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500 flex items-center gap-1.5">
+                    <Shield size={10} />
                     Administración
                   </span>
                 </div>
@@ -144,25 +160,51 @@ export default function Sidebar() {
 
         {/* Bottom Actions */}
         <div className={`border-t border-stone-200 dark:border-stone-800 py-3 ${sidebarOpen ? 'px-3' : 'px-2'} space-y-1`}>
+          {/* Admin Toggle */}
+          <button
+            onClick={() => dispatch({ type: 'TOGGLE_ADMIN' })}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+              isAdmin
+                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
+                : 'text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800/60'
+            } ${!sidebarOpen ? 'justify-center px-2' : ''}`}
+          >
+            <Shield size={20} strokeWidth={1.8} />
+            {sidebarOpen && <span>{isAdmin ? 'Modo Admin' : 'Activar Admin'}</span>}
+          </button>
+
           {/* Dark Mode Toggle */}
           <button
             onClick={toggleDarkMode}
             aria-label={darkMode ? 'Modo claro' : 'Modo oscuro'}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800/60 transition-all duration-200 cursor-pointer ${!sidebarOpen ? 'justify-center px-2' : ''}`}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800/60 transition-all duration-200 cursor-pointer ${!sidebarOpen ? 'justify-center px-2' : ''}`}
           >
             {darkMode ? <Sun size={20} strokeWidth={1.8} /> : <Moon size={20} strokeWidth={1.8} />}
             {sidebarOpen && <span>{darkMode ? 'Modo claro' : 'Modo oscuro'}</span>}
           </button>
 
-          {/* User Profile */}
+          {/* User Profile with progress */}
           <div className={`flex items-center gap-3 px-4 py-3 ${!sidebarOpen ? 'justify-center px-2' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center flex-shrink-0">
-              <User size={16} className="text-indigo-600 dark:text-indigo-400" />
+            <div className="relative flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center">
+                <User size={16} className="text-indigo-600 dark:text-indigo-400" />
+              </div>
+              {/* Mini progress ring */}
+              <svg className="absolute -inset-0.5 w-10 h-10 -rotate-90" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" strokeWidth="2" className="text-stone-200 dark:text-stone-700" />
+                <circle
+                  cx="20" cy="20" r="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                  strokeDasharray={`${(overallProgress / 100) * 113} 113`}
+                  className="text-indigo-500"
+                />
+              </svg>
             </div>
             {sidebarOpen && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-stone-900 dark:text-stone-100 truncate">{currentUser?.name || 'Sin usuario'}</p>
-                <p className="text-xs text-stone-500 dark:text-stone-400 truncate">Racha: {state.userProgress.dailyStreak} días 🔥</p>
+                <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
+                  {overallProgress}% completado · {state.userProgress.dailyStreak} días 🔥
+                </p>
               </div>
             )}
           </div>
@@ -170,7 +212,7 @@ export default function Sidebar() {
           {/* Switch User */}
           <button
             onClick={logout}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800/60 transition-all duration-200 cursor-pointer ${!sidebarOpen ? 'justify-center px-2' : ''}`}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-stone-600 hover:bg-rose-50 hover:text-rose-600 dark:text-stone-400 dark:hover:bg-rose-900/20 dark:hover:text-rose-400 transition-all duration-200 cursor-pointer ${!sidebarOpen ? 'justify-center px-2' : ''}`}
             aria-label="Cambiar de usuario"
           >
             <LogOut size={20} strokeWidth={1.8} />

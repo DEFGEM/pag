@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, CheckCircle2, Clock, Copy, Check, BookOpen, Lightbulb } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, Clock, Copy, Check, BookOpen, Lightbulb, ClipboardCheck, ArrowLeft } from 'lucide-react';
 import gsap from 'gsap';
 
 function renderSafeContent(text: string, codeClass = 'px-1.5 py-0.5 bg-stone-100 dark:bg-stone-800 rounded text-sm font-mono text-indigo-600 dark:text-indigo-400', strongClass = 'text-stone-900 dark:text-stone-100') {
@@ -47,6 +47,7 @@ export default function Lesson() {
   const mod = modules.find((m) => m.id === moduleId);
   const lesson = mod?.lessons.find((l) => l.id === lessonId);
   const isCompleted = lessonId ? userProgress.completedLessons.includes(lessonId) : false;
+  const allLessonsCompleted = mod ? mod.lessons.every((l) => userProgress.completedLessons.includes(l.id)) : false;
 
   useEffect(() => {
     if (contentRef.current) {
@@ -103,11 +104,12 @@ export default function Lesson() {
         <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400 mb-2">
           <button
             onClick={() => navigate(`/modules/${mod.id}`)}
-            className="hover:text-indigo-600 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all cursor-pointer"
           >
+            <ArrowLeft size={14} />
             {mod.title}
           </button>
-          <ChevronLeft size={14} className="rotate-180" />
+          <span className="text-stone-300 dark:text-stone-600">/</span>
           <span>Lección {currentIndex + 1} de {mod.lessons.length}</span>
         </div>
         <div className="flex items-start justify-between gap-4">
@@ -215,6 +217,14 @@ export default function Lesson() {
               >
                 Siguiente
                 <ChevronRight size={16} />
+              </button>
+            ) : allLessonsCompleted ? (
+              <button
+                onClick={() => navigate(`/modules/${mod.id}/quiz`)}
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer"
+              >
+                <ClipboardCheck size={16} />
+                Tomar Evaluación
               </button>
             ) : (
               <div />

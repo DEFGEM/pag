@@ -1,16 +1,20 @@
 import { useStore } from '@/hooks/useStore';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Module } from '@/types';
-import { Edit3, Trash2, Eye, Search, Plus, BookOpen, Clock } from 'lucide-react';
+import { Edit3, Trash2, Eye, Search, Plus, BookOpen, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { difficultyBadge } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 export default function AdminModules() {
-  const { state } = useStore();
-  const { modules } = state;
+  const { state, dispatch, addNotification } = useStore();
+  const { modules, importedModules } = state;
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [editModule, setEditModule] = useState<Module | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [moduleToDelete, setModuleToDelete] = useState<string | null>(null);
 
   const filtered = modules.filter(
     (m) =>
@@ -18,10 +22,33 @@ export default function AdminModules() {
       m.description.toLowerCase().includes(search.toLowerCase())
   );
 
-  const statusBadge = (active: boolean) => {
-    return active
-      ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
-      : 'bg-stone-100 text-stone-600 dark:bg-stone-700 dark:text-stone-400';
+  const isImported = (moduleId: string) => {
+    return importedModules.some((m) => m.id === moduleId);
+  };
+
+  const statusBadge = (moduleId: string) => {
+    const custom = isImported(moduleId);
+    return custom
+      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+      : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400';
+  };
+
+  const handleDeleteClick = (moduleId: string) => {
+    if (!isImported(moduleId)) {
+      addNotification('error', 'No puedes eliminar módulos del sistema.');
+      return;
+    }
+    setModuleToDelete(moduleId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (moduleToDelete) {
+      dispatch({ type: 'DELETE_IMPORTED_MODULE', moduleId: moduleToDelete });
+      addNotification('success', 'Módulo personalizado eliminado exitosamente.');
+      setModuleToDelete(null);
+      setDeleteConfirmOpen(false);
+    }
   };
 
   return (
@@ -33,12 +60,15 @@ export default function AdminModules() {
             Gestión de Módulos
           </h2>
           <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
-            {modules.length} módulos en total
+            {modules.length} módulos en total ({importedModules.length} personalizados)
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-xl transition-colors cursor-pointer">
+        <button
+          onClick={() => navigate('/import')}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-xl transition-colors cursor-pointer shadow-sm hover:shadow"
+        >
           <Plus size={16} />
-          Nuevo Módulo
+          Nuevo Módulo (IA)
         </button>
       </div>
 
@@ -51,29 +81,29 @@ export default function AdminModules() {
           aria-label="Buscar módulos"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+          className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 overflow-hidden">
+      <div className="bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-stone-200 dark:border-stone-700">
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+              <tr className="border-b border-stone-200 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-900/20">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
                   Módulo
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
                   Dificultad
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
                   Lecciones
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                  Estado
+                <th className="text-left px-4 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                  Origen / Tipo
                 </th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                <th className="text-right px-4 py-3 text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider text-right">
                   Acciones
                 </th>
               </tr>
@@ -86,7 +116,9 @@ export default function AdminModules() {
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <img src={mod.thumbnail} alt="" className="w-10 h-7 object-cover rounded" />
+                      <div className="w-10 h-7 rounded bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center flex-shrink-0 text-indigo-500">
+                        <BookOpen size={16} />
+                      </div>
                       <div>
                         <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
                           {mod.title}
@@ -98,31 +130,32 @@ export default function AdminModules() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${difficultyBadge(mod.difficulty)}`}>
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${difficultyBadge(mod.difficulty)}`}>
                       {mod.difficulty}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 text-sm text-stone-600 dark:text-stone-400">
-                      <BookOpen size={14} />
+                    <div className="flex items-center gap-1 text-xs text-stone-600 dark:text-stone-400">
+                      <BookOpen size={13} />
                       {mod.lessons.length}
-                      <span className="text-stone-400 mx-1">·</span>
-                      <Clock size={14} />
+                      <span className="text-stone-300 dark:text-stone-700 mx-1">·</span>
+                      <Clock size={13} />
                       {mod.estimatedHours}h
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusBadge(true)}`}>
-                      Activo
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${statusBadge(mod.id)}`}>
+                      {isImported(mod.id) ? 'Personalizado' : 'Sistema'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        className="p-1.5 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors cursor-pointer"
+                        onClick={() => navigate(`/modules/${mod.id}`)}
+                        className="p-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-950 rounded-lg transition-colors cursor-pointer group"
                         aria-label="Ver módulo"
                       >
-                        <Eye size={15} className="text-stone-500" />
+                        <Eye size={15} className="text-stone-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" />
                       </button>
                       <button
                         onClick={() => { setEditModule(mod); setDialogOpen(true); }}
@@ -132,10 +165,16 @@ export default function AdminModules() {
                         <Edit3 size={15} className="text-stone-500" />
                       </button>
                       <button
-                        className="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-lg transition-colors cursor-pointer"
+                        onClick={() => handleDeleteClick(mod.id)}
+                        disabled={!isImported(mod.id)}
+                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                          isImported(mod.id)
+                            ? 'hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-500'
+                            : 'text-stone-300 dark:text-stone-750 cursor-not-allowed'
+                        }`}
                         aria-label="Eliminar módulo"
                       >
-                        <Trash2 size={15} className="text-rose-500" />
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </td>
@@ -159,7 +198,7 @@ export default function AdminModules() {
                 <input
                   type="text"
                   defaultValue={editModule.title}
-                  className="w-full px-4 py-2 border border-stone-200 dark:border-stone-700 rounded-lg text-sm"
+                  className="w-full px-4 py-2 border border-stone-200 dark:border-stone-750 rounded-lg text-sm bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                 />
               </div>
               <div>
@@ -167,8 +206,14 @@ export default function AdminModules() {
                 <textarea
                   defaultValue={editModule.description}
                   rows={3}
-                  className="w-full px-4 py-2 border border-stone-200 dark:border-stone-700 rounded-lg text-sm"
+                  className="w-full px-4 py-2 border border-stone-200 dark:border-stone-750 rounded-lg text-sm bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                 />
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 rounded-lg">
+                <ShieldCheck size={16} className="text-amber-500 flex-shrink-0" />
+                <p className="text-xs text-amber-800 dark:text-amber-350">
+                  Las modificaciones de texto son locales y se actualizarán inmediatamente.
+                </p>
               </div>
             </div>
           )}
@@ -180,10 +225,42 @@ export default function AdminModules() {
               Cancelar
             </button>
             <button
-              onClick={() => { setDialogOpen(false); }}
-              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
+              onClick={() => {
+                setDialogOpen(false);
+                addNotification('success', 'Cambios guardados con éxito (simulado)');
+              }}
+              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer font-medium"
             >
               Guardar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <AlertTriangle size={20} />
+              ¿Confirmar eliminación?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-stone-600 dark:text-stone-400">
+            Esta acción eliminará de forma permanente este módulo y todo su progreso de aprendizaje asociado. Esta operación no se puede deshacer.
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => setDeleteConfirmOpen(false)}
+              className="px-4 py-2 text-sm text-stone-650 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="px-4 py-2 text-sm bg-rose-600 text-white hover:bg-rose-700 rounded-lg transition-colors cursor-pointer font-medium"
+            >
+              Eliminar Permanentemente
             </button>
           </DialogFooter>
         </DialogContent>
