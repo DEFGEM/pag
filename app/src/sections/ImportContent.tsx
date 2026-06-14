@@ -3,6 +3,7 @@ import { useStore } from '@/hooks/useStore';
 import { Upload, FileText, X, Loader2, BookOpen, CheckCircle2, Sparkles, FileCode, HelpCircle, File } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import QuizEditor from '@/components/QuizEditor';
+import LessonEditor from '@/components/LessonEditor';
 import type { Difficulty, Module, Lesson, Question } from '@/types';
 
 async function extractPdfText(file: File): Promise<string> {
@@ -528,19 +529,18 @@ export default function ImportContent() {
               </span>
             </div>
 
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-              {generatedModule.lessons.map((lesson: Lesson, i: number) => (
-                <div
-                  key={lesson.id}
-                  className="flex items-center justify-between py-2.5 px-4 bg-stone-50 dark:bg-stone-900/50 rounded-xl border border-stone-100 dark:border-stone-800 hover:bg-stone-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-xs text-stone-400 font-mono w-5">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="text-sm font-medium text-stone-700 dark:text-stone-300 truncate">{lesson.title}</span>
-                  </div>
-                  <span className="text-xs text-stone-400 font-mono ml-3">{lesson.duration}min</span>
-                </div>
-              ))}
+            {/* Lesson Editor */}
+            <div className="mt-5 pt-4 border-t border-stone-200 dark:border-stone-800">
+              <LessonEditor
+                lessons={generatedModule.lessons}
+                onChange={(updatedLessons: Lesson[]) => {
+                  setGeneratedModule({
+                    ...generatedModule,
+                    lessons: updatedLessons,
+                    estimatedHours: Math.ceil(updatedLessons.reduce((acc, l) => acc + l.duration, 0) / 60),
+                  });
+                }}
+              />
             </div>
 
             {/* Quiz Editor */}

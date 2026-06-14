@@ -1,11 +1,12 @@
 import { useStore } from '@/hooks/useStore';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Module, Question } from '@/types';
+import type { Module, Question, Lesson } from '@/types';
 import { Edit3, Trash2, Eye, Search, Plus, BookOpen, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { difficultyBadge } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import QuizEditor from '@/components/QuizEditor';
+import LessonEditor from '@/components/LessonEditor';
 
 export default function AdminModules() {
   const { state, dispatch, addNotification } = useStore();
@@ -16,6 +17,7 @@ export default function AdminModules() {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editQuestions, setEditQuestions] = useState<Question[]>([]);
+  const [editLessons, setEditLessons] = useState<Lesson[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [moduleToDelete, setModuleToDelete] = useState<string | null>(null);
@@ -25,6 +27,7 @@ export default function AdminModules() {
       setEditTitle(editModule.title);
       setEditDescription(editModule.description);
       setEditQuestions(editModule.quiz?.questions || []);
+      setEditLessons(editModule.lessons || []);
     }
   }, [editModule]);
 
@@ -224,6 +227,14 @@ export default function AdminModules() {
                 />
               </div>
 
+              {/* Lesson Editor */}
+              <div className="pt-3 border-t border-stone-200 dark:border-stone-700">
+                <LessonEditor
+                  lessons={editLessons}
+                  onChange={setEditLessons}
+                />
+              </div>
+
               {/* Quiz Editor */}
               <div className="pt-3 border-t border-stone-200 dark:border-stone-700">
                 <QuizEditor
@@ -256,6 +267,8 @@ export default function AdminModules() {
                     updates: {
                       title: editTitle,
                       description: editDescription,
+                      lessons: editLessons,
+                      estimatedHours: Math.ceil(editLessons.reduce((acc, l) => acc + l.duration, 0) / 60),
                       quiz: { ...editModule.quiz, questions: editQuestions },
                     },
                   });
