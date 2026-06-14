@@ -1,10 +1,11 @@
 import { useStore } from '@/hooks/useStore';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Module } from '@/types';
+import type { Module, Question } from '@/types';
 import { Edit3, Trash2, Eye, Search, Plus, BookOpen, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { difficultyBadge } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import QuizEditor from '@/components/QuizEditor';
 
 export default function AdminModules() {
   const { state, dispatch, addNotification } = useStore();
@@ -12,9 +13,20 @@ export default function AdminModules() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [editModule, setEditModule] = useState<Module | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editQuestions, setEditQuestions] = useState<Question[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [moduleToDelete, setModuleToDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editModule) {
+      setEditTitle(editModule.title);
+      setEditDescription(editModule.description);
+      setEditQuestions(editModule.quiz?.questions || []);
+    }
+  }, [editModule]);
 
   const filtered = modules.filter(
     (m) =>
@@ -187,32 +199,43 @@ export default function AdminModules() {
 
       {/* Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Módulo</DialogTitle>
           </DialogHeader>
           {editModule && (
-            <div className="space-y-4 py-4">
+            <div className="space-y-5 py-4">
               <div>
-                <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1.5">Título</label>
+                <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 mb-1.5 uppercase tracking-wider">Título</label>
                 <input
                   type="text"
-                  defaultValue={editModule.title}
-                  className="w-full px-4 py-2 border border-stone-200 dark:border-stone-750 rounded-lg text-sm bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-stone-200 dark:border-stone-700 rounded-lg text-sm bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                 />
               </div>
               <div>
-                <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1.5">Descripción</label>
+                <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 mb-1.5 uppercase tracking-wider">Descripción</label>
                 <textarea
-                  defaultValue={editModule.description}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
                   rows={3}
-                  className="w-full px-4 py-2 border border-stone-200 dark:border-stone-750 rounded-lg text-sm bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  className="w-full px-4 py-2.5 border border-stone-200 dark:border-stone-700 rounded-lg text-sm bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 resize-none"
                 />
               </div>
+
+              {/* Quiz Editor */}
+              <div className="pt-3 border-t border-stone-200 dark:border-stone-700">
+                <QuizEditor
+                  questions={editQuestions}
+                  onChange={setEditQuestions}
+                />
+              </div>
+
               <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 rounded-lg">
                 <ShieldCheck size={16} className="text-amber-500 flex-shrink-0" />
-                <p className="text-xs text-amber-800 dark:text-amber-350">
-                  Las modificaciones de texto son locales y se actualizarán inmediatamente.
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  Los cambios se guardarán inmediatamente al presionar "Guardar".
                 </p>
               </div>
             </div>
@@ -226,12 +249,23 @@ export default function AdminModules() {
             </button>
             <button
               onClick={() => {
+                if (editModule) {
+                  dispatch({
+                    type: 'UPDATE_MODULE',
+                    moduleId: editModule.id,
+                    updates: {
+                      title: editTitle,
+                      description: editDescription,
+                      quiz: { ...editModule.quiz, questions: editQuestions },
+                    },
+                  });
+                  addNotification('success', 'Módulo actualizado correctamente');
+                }
                 setDialogOpen(false);
-                addNotification('success', 'Cambios guardados con éxito (simulado)');
               }}
               className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer font-medium"
             >
-              Guardar
+              Guardar Cambios
             </button>
           </DialogFooter>
         </DialogContent>
