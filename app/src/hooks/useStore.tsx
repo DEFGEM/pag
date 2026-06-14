@@ -33,6 +33,8 @@ const defaultProgress: UserProgress = {
   studyTimeMinutes: 0,
   dailyStreak: 0,
   lastStudyDate: null,
+  notes: [],
+  bookmarks: [],
 };
 
 function getDefaultSettings(): AppSettings {
@@ -108,6 +110,10 @@ type Action =
   | { type: 'SET_USER'; userId: string }
   | { type: 'REGISTER_USER'; userId: string; userName: string; email: string; password: string; isAdmin?: boolean }
   | { type: 'LOGIN_USER'; email: string; password: string }
+  | { type: 'ADD_NOTE'; lessonId: string; content: string }
+  | { type: 'UPDATE_NOTE'; noteId: string; content: string }
+  | { type: 'DELETE_NOTE'; noteId: string }
+  | { type: 'TOGGLE_BOOKMARK'; lessonId: string }
   | { type: 'LOGOUT' };
 
 function appReducer(state: AppState, action: Action): AppState {
@@ -266,6 +272,56 @@ function appReducer(state: AppState, action: Action): AppState {
         currentUserId: userEntry.user.id,
         userProgress: userEntry.progress,
         isAdmin: userEntry.user.isAdmin || false,
+      };
+    }
+    case 'ADD_NOTE': {
+      const newNote = {
+        id: `note-${Date.now()}`,
+        lessonId: action.lessonId,
+        content: action.content,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        userProgress: {
+          ...state.userProgress,
+          notes: [...state.userProgress.notes, newNote],
+        },
+      };
+    }
+    case 'UPDATE_NOTE': {
+      return {
+        ...state,
+        userProgress: {
+          ...state.userProgress,
+          notes: state.userProgress.notes.map((n) =>
+            n.id === action.noteId
+              ? { ...n, content: action.content, updatedAt: new Date().toISOString() }
+              : n
+          ),
+        },
+      };
+    }
+    case 'DELETE_NOTE': {
+      return {
+        ...state,
+        userProgress: {
+          ...state.userProgress,
+          notes: state.userProgress.notes.filter((n) => n.id !== action.noteId),
+        },
+      };
+    }
+    case 'TOGGLE_BOOKMARK': {
+      const isBookmarked = state.userProgress.bookmarks.includes(action.lessonId);
+      return {
+        ...state,
+        userProgress: {
+          ...state.userProgress,
+          bookmarks: isBookmarked
+            ? state.userProgress.bookmarks.filter((id) => id !== action.lessonId)
+            : [...state.userProgress.bookmarks, action.lessonId],
+        },
       };
     }
     case 'LOGOUT': {

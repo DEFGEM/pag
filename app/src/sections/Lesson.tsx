@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, CheckCircle2, Clock, Copy, Check, BookOpen, Lightbulb, ClipboardCheck, ArrowLeft } from 'lucide-react';
+import NotesBookmarks from '@/components/NotesBookmarks';
 import gsap from 'gsap';
 
 function renderSafeContent(text: string, codeClass = 'px-1.5 py-0.5 bg-stone-100 dark:bg-stone-800 rounded text-sm font-mono text-indigo-600 dark:text-indigo-400', strongClass = 'text-stone-900 dark:text-stone-100') {
@@ -192,6 +193,13 @@ export default function Lesson() {
           );
         })}
       </div>
+
+      {/* Notes & Bookmarks */}
+      {lessonId && (
+        <div className="mt-8 pt-6 border-t border-stone-200 dark:border-stone-700">
+          <NotesBookmarks lessonId={lessonId} />
+        </div>
+      )}
 
       {/* Actions */}
       <div className="mt-8 pt-6 border-t border-stone-200 dark:border-stone-700">

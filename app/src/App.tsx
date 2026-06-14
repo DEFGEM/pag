@@ -11,6 +11,7 @@ import Quiz from '@/sections/Quiz';
 import Evaluations from '@/sections/Evaluations';
 import Achievements from '@/sections/Achievements';
 import ImportContent from '@/sections/ImportContent';
+import PlaygroundPage from '@/sections/PlaygroundPage';
 import AdminModules from '@/sections/AdminModules';
 import AdminExams from '@/sections/AdminExams';
 import AdminStats from '@/sections/AdminStats';
@@ -46,6 +47,7 @@ function AppLayout() {
               <Route path="/evaluations" element={<Evaluations />} />
               <Route path="/achievements" element={<Achievements />} />
               <Route path="/import" element={<ImportContent />} />
+              <Route path="/playground" element={<PlaygroundPage />} />
               <Route path="/admin/modules" element={<AdminModules />} />
               <Route path="/admin/exams" element={<AdminExams />} />
               <Route path="/admin/stats" element={<AdminStats />} />

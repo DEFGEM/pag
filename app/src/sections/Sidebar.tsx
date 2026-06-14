@@ -20,11 +20,13 @@ import {
   LogOut,
   Shield,
   Sparkles,
+  Code,
 } from 'lucide-react';
 
 const mainNavItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { label: 'Módulos', path: '/modules', icon: BookOpen },
+  { label: 'Playground', path: '/playground', icon: Code },
   { label: 'Evaluaciones', path: '/evaluations', icon: ClipboardCheck },
   { label: 'Logros', path: '/achievements', icon: Trophy },
 ];

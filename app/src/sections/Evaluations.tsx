@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
-import { ClipboardCheck, CheckCircle2, Lock, Clock, ArrowRight } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Lock, Clock, ArrowRight, History } from 'lucide-react';
+import QuizHistory from '@/components/QuizHistory';
 
 export default function Evaluations() {
   const { state, getModuleProgress } = useStore();
@@ -62,9 +63,10 @@ export default function Evaluations() {
   };
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto">
       <div className="mb-6">
-        <h2 className="text-2xl font-medium text-stone-900 dark:text-stone-100">
+        <h2 className="text-2xl font-medium text-stone-900 dark:text-stone-100 flex items-center gap-2">
+          <ClipboardCheck className="text-indigo-500" size={24} />
           Evaluaciones
         </h2>
         <p className="text-stone-600 dark:text-stone-400 mt-1">
@@ -72,52 +74,69 @@ export default function Evaluations() {
         </p>
       </div>
 
-      <div className="space-y-3">
-        {evaluations.map(({ mod, quizScore, status }) => {
-          const config = statusConfig[status];
-          const Icon = config.icon;
+      {/* Quiz History */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-stone-900 dark:text-stone-100 flex items-center gap-2 mb-4">
+          <History size={20} className="text-indigo-500" />
+          Historial de Exámenes
+        </h3>
+        <QuizHistory />
+      </div>
 
-          return (
-            <div
-              key={mod.id}
-              onClick={() => {
-                if (status === 'ready' || status === 'completed') {
-                  navigate(`/modules/${mod.id}/quiz`);
-                }
-              }}
-              className={`
-                flex items-center gap-4 p-4 rounded-xl border transition-all duration-200
-                ${
-                  status === 'locked' || status === 'in-progress'
-                    ? 'bg-stone-50 dark:bg-stone-800/30 border-stone-200 dark:border-stone-700/50 cursor-default opacity-70'
-                    : 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-600 cursor-pointer'
-                }
-              `}
-            >
-              <div className={`w-10 h-10 rounded-lg ${config.bg} flex items-center justify-center flex-shrink-0`}>
-                <Icon size={20} className={config.color} />
-              </div>
+      {/* Available Evaluations */}
+      <div>
+        <h3 className="text-lg font-semibold text-stone-900 dark:text-stone-100 flex items-center gap-2 mb-4">
+          <ClipboardCheck size={20} className="text-indigo-500" />
+          Evaluaciones Disponibles
+        </h3>
 
-              <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-stone-900 dark:text-stone-100 text-sm">{mod.title}</h4>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${config.bg} ${config.color}`}>
-                    {config.label}
-                  </span>
-                  {quizScore && (
-                    <span className="text-xs text-teal-600 dark:text-teal-400 font-medium">
-                      {quizScore}%
-                    </span>
-                  )}
+        <div className="space-y-3">
+          {evaluations.map(({ mod, quizScore, status }) => {
+            const config = statusConfig[status];
+            const Icon = config.icon;
+
+            return (
+              <div
+                key={mod.id}
+                onClick={() => {
+                  if (status === 'ready' || status === 'completed') {
+                    navigate(`/modules/${mod.id}/quiz`);
+                  }
+                }}
+                className={`
+                  flex items-center gap-4 p-4 rounded-xl border transition-all duration-200
+                  ${
+                    status === 'locked' || status === 'in-progress'
+                      ? 'bg-stone-50 dark:bg-stone-800/30 border-stone-200 dark:border-stone-700/50 cursor-default opacity-70'
+                      : 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-600 cursor-pointer'
+                  }
+                `}
+              >
+                <div className={`w-10 h-10 rounded-lg ${config.bg} flex items-center justify-center flex-shrink-0`}>
+                  <Icon size={20} className={config.color} />
                 </div>
-              </div>
 
-              {(status === 'ready' || status === 'completed') && (
-                <ArrowRight size={16} className="text-stone-400 dark:text-stone-600 flex-shrink-0" />
-              )}
-            </div>
-          );
-        })}
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-stone-900 dark:text-stone-100 text-sm">{mod.title}</h4>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${config.bg} ${config.color}`}>
+                      {config.label}
+                    </span>
+                    {quizScore && (
+                      <span className="text-xs text-teal-600 dark:text-teal-400 font-medium">
+                        {quizScore}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {(status === 'ready' || status === 'completed') && (
+                  <ArrowRight size={16} className="text-stone-400 dark:text-stone-600 flex-shrink-0" />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

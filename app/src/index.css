@@ -254,3 +254,40 @@ pre code {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Mobile responsive utilities */
+@media (max-width: 768px) {
+  .mobile-p-4 { padding: 1rem; }
+  .mobile-p-6 { padding: 1.5rem; }
+  .mobile-text-sm { font-size: 0.875rem; }
+  .mobile-gap-4 { gap: 1rem; }
+  .mobile-grid-1 { grid-template-columns: 1fr; }
+  .mobile-hide { display: none; }
+  .mobile-full { width: 100%; }
+  .mobile-flex-col { flex-direction: column; }
+}
+
+/* Touch-friendly tap targets */
+@media (hover: none) and (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Safe area for iOS */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Mobile scrollbar */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+}

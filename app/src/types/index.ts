@@ -47,6 +47,14 @@ export interface Module {
   category: string;
 }
 
+export interface Note {
+  id: string;
+  lessonId: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UserProgress {
   completedLessons: string[]; // IDs de lecciones completadas
   completedModules: string[]; // IDs de módulos completados
@@ -56,6 +64,8 @@ export interface UserProgress {
   studyTimeMinutes: number;
   dailyStreak: number;
   lastStudyDate: string | null;
+  notes: Note[];
+  bookmarks: string[]; // lessonIds
 }
 
 export interface Achievement {
