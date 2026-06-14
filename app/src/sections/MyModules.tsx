@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
-import { Upload, FileText, X, Loader2, BookOpen, CheckCircle2, Sparkles, FileCode, HelpCircle, File, Search, Trash2, Clock } from 'lucide-react';
+import { Upload, FileText, X, Loader2, BookOpen, CheckCircle2, Sparkles, FileCode, HelpCircle, File, Search, Trash2, Clock, Eye, Edit3 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import QuizEditor from '@/components/QuizEditor';
 import LessonEditor from '@/components/LessonEditor';
@@ -125,6 +126,7 @@ function splitTextIntoLessons(text: string, count: number): { title: string; con
 
 export default function MyModules() {
   const { state, dispatch, addNotification } = useStore();
+  const navigate = useNavigate();
   const { currentUserId, usersData } = state;
   const currentUser = currentUserId ? usersData[currentUserId] : null;
   const customModules = currentUser?.customModules || [];
@@ -133,7 +135,8 @@ export default function MyModules() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   // Import state
-  const [activeTab, setActiveTab] = useState<'import' | 'list'>('list');
+  const [activeTab, setActiveTab] = useState<'import' | 'list' | 'edit'>('list');
+  const [editModuleData, setEditModuleData] = useState<Module | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState('');
@@ -295,6 +298,27 @@ export default function MyModules() {
     setDeleteConfirm(null);
   };
 
+  const handleSaveEdit = () => {
+    if (editModuleData && generatedModule) {
+      dispatch({
+        type: 'UPDATE_USER_MODULE',
+        moduleId: editModuleData.id,
+        updates: {
+          title: generatedModule.title,
+          description: generatedModule.description,
+          lessons: generatedModule.lessons,
+          estimatedHours: generatedModule.estimatedHours,
+          quiz: generatedModule.quiz,
+          difficulty: generatedModule.difficulty,
+        },
+      });
+      addNotification('success', 'Módulo actualizado correctamente');
+      setActiveTab('list');
+      setEditModuleData(null);
+      setGeneratedModule(null);
+    }
+  };
+
   const handleDiscard = () => {
     setGeneratedModule(null);
     setFile(null);
@@ -333,9 +357,9 @@ export default function MyModules() {
               Importar Contenido
             </button>
           )}
-          {activeTab === 'import' && (
+          {activeTab === 'edit' && (
             <button
-              onClick={() => { handleDiscard(); setActiveTab('list'); }}
+              onClick={() => { handleDiscard(); setEditModuleData(null); setActiveTab('list'); }}
               className="flex items-center gap-2 px-4 py-2 bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-600 text-stone-700 dark:text-stone-300 text-sm rounded-xl transition-colors cursor-pointer"
             >
               Ver Mis Módulos
@@ -536,7 +560,7 @@ export default function MyModules() {
             </div>
           )}
         </div>
-      ) : activeTab === 'import' && generatedModule ? (
+      ) : (activeTab === 'import' || activeTab === 'edit') && generatedModule ? (
         /* Generated Preview */
         <div className="space-y-6">
           <div className="bg-white dark:bg-stone-800 rounded-2xl border border-stone-200 dark:border-stone-700 p-6 shadow-lg">
@@ -587,16 +611,20 @@ export default function MyModules() {
 
           <div className="flex gap-3">
             <button
-              onClick={handleDiscard}
+              onClick={() => {
+                handleDiscard();
+                setEditModuleData(null);
+                setActiveTab('list');
+              }}
               className="flex-1 py-3 border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 rounded-xl font-semibold hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors cursor-pointer text-sm"
             >
               Descartar
             </button>
             <button
-              onClick={handleSave}
+              onClick={activeTab === 'edit' ? handleSaveEdit : handleSave}
               className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-colors cursor-pointer text-sm shadow-lg shadow-indigo-500/20"
             >
-              Guardar Módulo
+              {activeTab === 'edit' ? 'Guardar Cambios' : 'Guardar Módulo'}
             </button>
           </div>
         </div>
@@ -674,7 +702,27 @@ export default function MyModules() {
                       </span>
                     </div>
                   </div>
-                  <div className="px-5 py-3 bg-stone-50 dark:bg-stone-900/50 border-t border-stone-100 dark:border-stone-700/50 flex items-center justify-end gap-1">
+                  <div className="px-5 py-3 bg-stone-50 dark:bg-stone-900/50 border-t border-stone-100 dark:border-stone-700/50 flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => navigate(`/modules/${mod.id}`)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Eye size={12} />
+                        Ver
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditModuleData(mod);
+                          setGeneratedModule(mod);
+                          setActiveTab('edit');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Edit3 size={12} />
+                        Editar
+                      </button>
+                    </div>
                     <button
                       onClick={() => setDeleteConfirm(mod.id)}
                       className="p-2 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-500 rounded-lg transition-colors cursor-pointer"

@@ -10,7 +10,7 @@ import LessonEditor from '@/components/LessonEditor';
 
 export default function AdminModules() {
   const { state, dispatch, addNotification } = useStore();
-  const { modules, importedModules } = state;
+  const { modules, importedModules, usersData } = state;
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [editModule, setEditModule] = useState<Module | null>(null);
@@ -22,6 +22,16 @@ export default function AdminModules() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [moduleToDelete, setModuleToDelete] = useState<string | null>(null);
 
+  // Collect all user custom modules with their owner info
+  const allUserModules: { module: Module; ownerName: string; ownerId: string }[] = [];
+  Object.values(usersData).forEach(({ user, customModules }) => {
+    if (customModules) {
+      customModules.forEach((cm) => {
+        allUserModules.push({ module: cm, ownerName: user.name, ownerId: user.id });
+      });
+    }
+  });
+
   useEffect(() => {
     if (editModule) {
       setEditTitle(editModule.title);
@@ -31,7 +41,13 @@ export default function AdminModules() {
     }
   }, [editModule]);
 
-  const filtered = modules.filter(
+  // Combine all modules for display
+  const allModules = [
+    ...modules,
+    ...allUserModules.filter((um) => !modules.some((m) => m.id === um.module.id)).map((um) => um.module),
+  ];
+
+  const filtered = allModules.filter(
     (m) =>
       m.title.toLowerCase().includes(search.toLowerCase()) ||
       m.description.toLowerCase().includes(search.toLowerCase())
@@ -41,15 +57,28 @@ export default function AdminModules() {
     return importedModules.some((m) => m.id === moduleId);
   };
 
+  const isUserModule = (moduleId: string) => {
+    return allUserModules.some((um) => um.module.id === moduleId);
+  };
+
+  const getUserModuleOwner = (moduleId: string) => {
+    return allUserModules.find((um) => um.module.id === moduleId);
+  };
+
   const statusBadge = (moduleId: string) => {
-    const custom = isImported(moduleId);
-    return custom
-      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-      : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400';
+    if (isUserModule(moduleId)) return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
+    if (isImported(moduleId)) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+    return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400';
+  };
+
+  const statusLabel = (moduleId: string) => {
+    if (isUserModule(moduleId)) return 'Usuario';
+    if (isImported(moduleId)) return 'Importado';
+    return 'Sistema';
   };
 
   const handleDeleteClick = (moduleId: string) => {
-    if (!isImported(moduleId)) {
+    if (!isImported(moduleId) && !isUserModule(moduleId)) {
       addNotification('error', 'No puedes eliminar módulos del sistema.');
       return;
     }
@@ -59,8 +88,15 @@ export default function AdminModules() {
 
   const confirmDelete = () => {
     if (moduleToDelete) {
-      dispatch({ type: 'DELETE_IMPORTED_MODULE', moduleId: moduleToDelete });
-      addNotification('success', 'Módulo personalizado eliminado exitosamente.');
+      if (isUserModule(moduleToDelete)) {
+        const owner = getUserModuleOwner(moduleToDelete);
+        if (owner) {
+          dispatch({ type: 'DELETE_USER_MODULE_AS_ADMIN', moduleId: moduleToDelete, ownerId: owner.ownerId });
+        }
+      } else {
+        dispatch({ type: 'DELETE_IMPORTED_MODULE', moduleId: moduleToDelete });
+      }
+      addNotification('success', 'Módulo eliminado exitosamente.');
       setModuleToDelete(null);
       setDeleteConfirmOpen(false);
     }
@@ -75,7 +111,7 @@ export default function AdminModules() {
             Gestión de Módulos
           </h2>
           <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
-            {modules.length} módulos en total ({importedModules.length} personalizados)
+            {modules.length} módulos en total ({importedModules.length} importados, {allUserModules.length} de usuarios)
           </p>
         </div>
         <button
@@ -159,14 +195,21 @@ export default function AdminModules() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${statusBadge(mod.id)}`}>
-                      {isImported(mod.id) ? 'Personalizado' : 'Sistema'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${statusBadge(mod.id)}`}>
+                        {statusLabel(mod.id)}
+                      </span>
+                      {isUserModule(mod.id) && (
+                        <span className="text-[10px] text-stone-400 dark:text-stone-500">
+                          {getUserModuleOwner(mod.id)?.ownerName}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => navigate(`/modules/${mod.id}`)}
+                        onClick={() => navigate(`/modules/${mod.id}${isUserModule(mod.id) ? '?adminPreview=true' : ''}`)}
                         className="p-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-950 rounded-lg transition-colors cursor-pointer group"
                         aria-label="Ver módulo"
                       >
@@ -181,9 +224,9 @@ export default function AdminModules() {
                       </button>
                       <button
                         onClick={() => handleDeleteClick(mod.id)}
-                        disabled={!isImported(mod.id)}
+                        disabled={!isImported(mod.id) && !isUserModule(mod.id)}
                         className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                          isImported(mod.id)
+                          isImported(mod.id) || isUserModule(mod.id)
                             ? 'hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-500'
                             : 'text-stone-300 dark:text-stone-750 cursor-not-allowed'
                         }`}
@@ -261,17 +304,33 @@ export default function AdminModules() {
             <button
               onClick={() => {
                 if (editModule) {
-                  dispatch({
-                    type: 'UPDATE_MODULE',
-                    moduleId: editModule.id,
-                    updates: {
-                      title: editTitle,
-                      description: editDescription,
-                      lessons: editLessons,
-                      estimatedHours: Math.ceil(editLessons.reduce((acc, l) => acc + l.duration, 0) / 60),
-                      quiz: { ...editModule.quiz, questions: editQuestions },
-                    },
-                  });
+                  const owner = getUserModuleOwner(editModule.id);
+                  if (owner) {
+                    dispatch({
+                      type: 'UPDATE_USER_MODULE_AS_ADMIN',
+                      moduleId: editModule.id,
+                      ownerId: owner.ownerId,
+                      updates: {
+                        title: editTitle,
+                        description: editDescription,
+                        lessons: editLessons,
+                        estimatedHours: Math.ceil(editLessons.reduce((acc, l) => acc + l.duration, 0) / 60),
+                        quiz: { ...editModule.quiz, questions: editQuestions },
+                      },
+                    });
+                  } else {
+                    dispatch({
+                      type: 'UPDATE_MODULE',
+                      moduleId: editModule.id,
+                      updates: {
+                        title: editTitle,
+                        description: editDescription,
+                        lessons: editLessons,
+                        estimatedHours: Math.ceil(editLessons.reduce((acc, l) => acc + l.duration, 0) / 60),
+                        quiz: { ...editModule.quiz, questions: editQuestions },
+                      },
+                    });
+                  }
                   addNotification('success', 'Módulo actualizado correctamente');
                 }
                 setDialogOpen(false);

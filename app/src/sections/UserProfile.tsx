@@ -1,52 +1,70 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
-import { User, Mail, Calendar, BookOpen, Clock, Trophy, Flame, Save, Download, Shield, FolderCog } from 'lucide-react';
+import { User, Mail, Calendar, BookOpen, Clock, Trophy, Flame, Save, Download, Shield, FolderCog, ArrowLeft, FileText, Eye } from 'lucide-react';
+import { difficultyBadge } from '@/lib/utils';
 
-export default function UserProfile() {
-  const { state, addNotification, getOverallProgress } = useStore();
+interface UserProfileProps {
+  viewUserId?: string;
+}
+
+export default function UserProfile({ viewUserId }: UserProfileProps) {
+  const { userId } = useParams<{ userId: string }>();
+  const effectiveUserId = viewUserId || userId;
+
+  const { state, addNotification } = useStore();
   const navigate = useNavigate();
-  const { currentUserId, usersData, userProgress, modules } = state;
-  const currentUser = currentUserId ? usersData[currentUserId]?.user : null;
+  const { currentUserId, usersData, modules } = state;
+
+  // Determine which user to show
+  const isAdminView = effectiveUserId && effectiveUserId !== currentUserId;
+  const targetUserId = effectiveUserId || currentUserId;
+  const targetUser = targetUserId ? usersData[targetUserId] : null;
+  const targetProgress = targetUser
+    ? { ...state.userProgress, ...targetUser.progress }
+    : state.userProgress;
+  const currentUserData = targetUser?.user || (currentUserId ? usersData[currentUserId]?.user : null);
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState(currentUser?.name || '');
-  const [editEmail, setEditEmail] = useState(currentUser?.email || '');
+  const [editName, setEditName] = useState(currentUserData?.name || '');
+  const [editEmail, setEditEmail] = useState(currentUserData?.email || '');
   const [showExportConfirm, setShowExportConfirm] = useState(false);
 
-  if (!currentUser) return null;
+  if (!currentUserData || !targetUser) return null;
 
-  const overallProgress = getOverallProgress();
-  const completedModules = userProgress.completedModules.length;
+  const overallProgress = (() => {
+    const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
+    const completed = targetProgress.completedLessons.length;
+    return totalLessons > 0 ? Math.round((completed / totalLessons) * 100) : 0;
+  })();
+
+  const completedModules = targetProgress.completedModules.length;
   const totalModules = modules.length;
-  const completedLessons = userProgress.completedLessons.length;
+  const completedLessons = targetProgress.completedLessons.length;
   const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
-  const studyHours = Math.floor(userProgress.studyTimeMinutes / 60);
-  const studyMinutes = userProgress.studyTimeMinutes % 60;
-  const completedQuizzes = Object.keys(userProgress.completedQuizzes).length;
+  const studyHours = Math.floor(targetProgress.studyTimeMinutes / 60);
+  const studyMinutes = targetProgress.studyTimeMinutes % 60;
+  const completedQuizzes = Object.keys(targetProgress.completedQuizzes).length;
+  const customModules = targetUser.customModules || [];
 
   const handleSaveProfile = () => {
     if (!editName.trim() || !editEmail.trim()) {
       addNotification('error', 'Nombre y correo son obligatorios');
       return;
     }
-    // We can't directly update user in store with current actions, so we use a workaround
-    // by re-registering with same id (effectively updates)
     const usersDataCopy = { ...state.usersData };
-    if (usersDataCopy[currentUserId!]) {
-      usersDataCopy[currentUserId!] = {
-        ...usersDataCopy[currentUserId!],
+    if (usersDataCopy[targetUserId!]) {
+      usersDataCopy[targetUserId!] = {
+        ...usersDataCopy[targetUserId!],
         user: {
-          ...usersDataCopy[currentUserId!].user,
+          ...usersDataCopy[targetUserId!].user,
           name: editName.trim(),
           email: editEmail.trim(),
         },
       };
-      // Force update via localStorage
       localStorage.setItem('pag_users', JSON.stringify(usersDataCopy));
       addNotification('success', 'Perfil actualizado correctamente');
       setIsEditing(false);
-      // Force page reload to pick up changes
       window.location.reload();
     }
   };
@@ -54,18 +72,18 @@ export default function UserProfile() {
   const handleExportProgress = () => {
     const exportData = {
       user: {
-        name: currentUser.name,
-        email: currentUser.email,
-        createdAt: currentUser.createdAt,
+        name: currentUserData.name,
+        email: currentUserData.email,
+        createdAt: currentUserData.createdAt,
       },
       progress: {
-        completedLessons: userProgress.completedLessons.length,
-        completedModules: userProgress.completedModules.length,
-        completedQuizzes: userProgress.completedQuizzes,
-        studyTimeMinutes: userProgress.studyTimeMinutes,
-        dailyStreak: userProgress.dailyStreak,
-        notes: userProgress.notes.length,
-        bookmarks: userProgress.bookmarks.length,
+        completedLessons: targetProgress.completedLessons.length,
+        completedModules: targetProgress.completedModules.length,
+        completedQuizzes: targetProgress.completedQuizzes,
+        studyTimeMinutes: targetProgress.studyTimeMinutes,
+        dailyStreak: targetProgress.dailyStreak,
+        notes: (targetProgress.notes || []).length,
+        bookmarks: (targetProgress.bookmarks || []).length,
       },
       exportDate: new Date().toISOString(),
     };
@@ -74,7 +92,7 @@ export default function UserProfile() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `progreso-rn-academy-${currentUser.name.replace(/\s+/g, '-').toLowerCase()}.json`;
+    a.download = `progreso-rn-academy-${currentUserData.name.replace(/\s+/g, '-').toLowerCase()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -86,21 +104,33 @@ export default function UserProfile() {
   const statCards = [
     { label: 'Progreso General', value: `${overallProgress}%`, icon: BookOpen, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
     { label: 'Módulos', value: `${completedModules}/${totalModules}`, icon: BookOpen, color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-900/20' },
-    { label: 'Lecciones', value: `${completedLessons}/${totalLessons}`, icon: BookOpen, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+    { label: 'Lecciones', value: `${completedLessons}/${totalLessons}`, icon: FileText, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
     { label: 'Tiempo de Estudio', value: `${studyHours}h ${studyMinutes}m`, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
     { label: 'Evaluaciones', value: `${completedQuizzes}/${totalModules}`, icon: Trophy, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/20' },
-    { label: 'Racha', value: `${userProgress.dailyStreak} días`, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/20' },
+    { label: 'Racha', value: `${targetProgress.dailyStreak} días`, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/20' },
   ];
+
+  const pageTitle = isAdminView ? `Perfil de ${currentUserData.name}` : 'Mi Perfil';
+  const pageSubtitle = isAdminView ? 'Vista del perfil del usuario' : 'Gestiona tu información y revisa tu progreso';
 
   return (
     <div className="p-6 max-w-4xl">
       {/* Header */}
       <div className="mb-8">
+        {isAdminView && (
+          <button
+            onClick={() => navigate('/admin/stats')}
+            className="flex items-center gap-1.5 text-sm text-stone-500 dark:text-stone-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer mb-3"
+          >
+            <ArrowLeft size={14} />
+            Volver a Estadísticas
+          </button>
+        )}
         <h2 className="text-2xl font-medium text-stone-900 dark:text-stone-100">
-          Mi Perfil
+          {pageTitle}
         </h2>
         <p className="text-stone-600 dark:text-stone-400 mt-1">
-          Gestiona tu información y revisa tu progreso
+          {pageSubtitle}
         </p>
       </div>
 
@@ -126,51 +156,53 @@ export default function UserProfile() {
               </div>
             </div>
 
-            <h3 className="font-semibold text-stone-900 dark:text-stone-100 text-lg">{currentUser.name}</h3>
-            <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{currentUser.email}</p>
+            <h3 className="font-semibold text-stone-900 dark:text-stone-100 text-lg">{currentUserData.name}</h3>
+            <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">{currentUserData.email}</p>
 
             <div className="flex items-center justify-center gap-2 mt-3 text-xs text-stone-400 dark:text-stone-500">
               <Calendar size={12} />
-              <span>Miembro desde {new Date(currentUser.createdAt).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
+              <span>Miembro desde {new Date(currentUserData.createdAt).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
             </div>
 
-            {currentUser.isAdmin && (
+            {currentUserData.isAdmin && (
               <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium">
                 <Shield size={12} />
                 Administrador
               </div>
             )}
 
-            {/* Actions */}
-            <div className="mt-6 space-y-2">
-              <button
-                onClick={() => setIsEditing(!isEditing)}
-                className="w-full py-2.5 px-4 bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-600 text-stone-700 dark:text-stone-300 rounded-xl text-sm font-medium transition-colors cursor-pointer"
-              >
-                {isEditing ? 'Cancelar' : 'Editar Perfil'}
-              </button>
-              <button
-                onClick={() => setShowExportConfirm(true)}
-                className="w-full py-2.5 px-4 border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Download size={14} />
-                Exportar Progreso
-              </button>
-              <button
-                onClick={() => navigate('/my-modules')}
-                className="w-full py-2.5 px-4 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center justify-center gap-2"
-              >
-                <FolderCog size={14} />
-                Mis Módulos
-              </button>
-            </div>
+            {/* Actions - only show for own profile */}
+            {!isAdminView && (
+              <div className="mt-6 space-y-2">
+                <button
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="w-full py-2.5 px-4 bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-600 text-stone-700 dark:text-stone-300 rounded-xl text-sm font-medium transition-colors cursor-pointer"
+                >
+                  {isEditing ? 'Cancelar' : 'Editar Perfil'}
+                </button>
+                <button
+                  onClick={() => setShowExportConfirm(true)}
+                  className="w-full py-2.5 px-4 border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Download size={14} />
+                  Exportar Progreso
+                </button>
+                <button
+                  onClick={() => navigate('/my-modules')}
+                  className="w-full py-2.5 px-4 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <FolderCog size={14} />
+                  Mis Módulos
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Stats & Edit */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Edit Form */}
-          {isEditing && (
+          {/* Edit Form - only for own profile */}
+          {!isAdminView && isEditing && (
             <div className="bg-white dark:bg-stone-800 rounded-2xl border border-stone-200 dark:border-stone-700 p-6">
               <h3 className="font-semibold text-stone-900 dark:text-stone-100 mb-4">Editar Información</h3>
               <div className="space-y-4">
@@ -231,13 +263,13 @@ export default function UserProfile() {
           {/* Recent Activity */}
           <div className="bg-white dark:bg-stone-800 rounded-2xl border border-stone-200 dark:border-stone-700 p-6">
             <h3 className="font-semibold text-stone-900 dark:text-stone-100 mb-4">Actividad Reciente</h3>
-            {userProgress.completedLessons.length === 0 && Object.keys(userProgress.completedQuizzes).length === 0 ? (
+            {targetProgress.completedLessons.length === 0 && Object.keys(targetProgress.completedQuizzes).length === 0 ? (
               <p className="text-sm text-stone-500 dark:text-stone-400 text-center py-4">
-                Aún no has completado ninguna actividad. ¡Comienza a aprender!
+                {isAdminView ? 'Este usuario aún no ha completado ninguna actividad.' : 'Aún no has completado ninguna actividad. ¡Comienza a aprender!'}
               </p>
             ) : (
               <div className="space-y-3">
-                {userProgress.completedModules.slice(-3).reverse().map((moduleId) => {
+                {targetProgress.completedModules.slice(-3).reverse().map((moduleId) => {
                   const mod = modules.find((m) => m.id === moduleId);
                   if (!mod) return null;
                   return (
@@ -249,12 +281,70 @@ export default function UserProfile() {
                         <p className="text-sm font-medium text-stone-900 dark:text-stone-100">Módulo completado</p>
                         <p className="text-xs text-stone-500 dark:text-stone-400">{mod.title}</p>
                       </div>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${difficultyBadge(mod.difficulty)}`}>
+                        {mod.difficulty}
+                      </span>
                     </div>
                   );
                 })}
               </div>
             )}
           </div>
+
+          {/* Quiz Scores */}
+          {Object.keys(targetProgress.completedQuizzes).length > 0 && (
+            <div className="bg-white dark:bg-stone-800 rounded-2xl border border-stone-200 dark:border-stone-700 p-6">
+              <h3 className="font-semibold text-stone-900 dark:text-stone-100 mb-4">Scores de Evaluaciones</h3>
+              <div className="space-y-2">
+                {Object.entries(targetProgress.completedQuizzes).map(([qId, score]) => {
+                  const mod = modules.find((m) => m.quiz.id === qId);
+                  const quizScore = score as number;
+                  const passed = quizScore >= 70;
+                  return (
+                    <div key={qId} className="flex items-center gap-3 p-3 bg-stone-50 dark:bg-stone-900/50 rounded-lg">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${passed ? 'bg-teal-500' : 'bg-rose-500'}`} />
+                      <span className="text-sm text-stone-700 dark:text-stone-300 flex-1 truncate">
+                        {mod ? mod.title : qId}
+                      </span>
+                      <span className={`text-sm font-bold ${passed ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {quizScore}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Custom Modules */}
+          {customModules.length > 0 && (
+            <div className="bg-white dark:bg-stone-800 rounded-2xl border border-stone-200 dark:border-stone-700 p-6">
+              <h3 className="font-semibold text-stone-900 dark:text-stone-100 mb-4">
+                {isAdminView ? 'Módulos Personalizados' : 'Mis Módulos Personalizados'}
+              </h3>
+              <div className="space-y-2">
+                {customModules.map((m) => (
+                  <div
+                    key={m.id}
+                    onClick={() => navigate(`/modules/${m.id}${isAdminView ? '?adminPreview=true' : ''}`)}
+                    className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800/30 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors cursor-pointer group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                      <FolderCog size={14} className="text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-stone-900 dark:text-stone-100 group-hover:text-purple-700 dark:group-hover:text-purple-400 transition-colors">{m.title}</p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400">{m.lessons.length} lecciones · {m.estimatedHours}h</p>
+                    </div>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${difficultyBadge(m.difficulty)}`}>
+                      {m.difficulty}
+                    </span>
+                    <Eye size={14} className="text-purple-300 dark:text-purple-600 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors flex-shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

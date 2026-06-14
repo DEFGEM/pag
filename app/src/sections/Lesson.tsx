@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, CheckCircle2, Clock, Copy, Check, BookOpen, Lightbulb, ClipboardCheck, ArrowLeft } from 'lucide-react';
@@ -39,6 +39,8 @@ function renderSafeContent(text: string, codeClass = 'px-1.5 py-0.5 bg-stone-100
 
 export default function Lesson() {
   const { moduleId, lessonId } = useParams<{ moduleId: string; lessonId: string }>();
+  const [searchParams] = useSearchParams();
+  const isAdminPreview = searchParams.get('adminPreview') === 'true';
   const { state, completeLesson, addNotification } = useStore();
   const navigate = useNavigate();
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -47,8 +49,8 @@ export default function Lesson() {
   const { modules, userProgress } = state;
   const mod = modules.find((m) => m.id === moduleId);
   const lesson = mod?.lessons.find((l) => l.id === lessonId);
-  const isCompleted = lessonId ? userProgress.completedLessons.includes(lessonId) : false;
-  const allLessonsCompleted = mod ? mod.lessons.every((l) => userProgress.completedLessons.includes(l.id)) : false;
+  const isCompleted = isAdminPreview ? false : (lessonId ? userProgress.completedLessons.includes(lessonId) : false);
+  const allLessonsCompleted = isAdminPreview ? true : (mod ? mod.lessons.every((l) => userProgress.completedLessons.includes(l.id)) : false);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -65,11 +67,15 @@ export default function Lesson() {
   const nextLesson = currentIndex < (mod?.lessons.length ?? 0) - 1 ? mod?.lessons[currentIndex + 1] : null;
 
   const handleComplete = useCallback(() => {
+    if (isAdminPreview) {
+      addNotification('info', 'Vista previa: no se guarda progreso');
+      return;
+    }
     if (lessonId && !isCompleted) {
       completeLesson(lessonId);
       addNotification('success', 'Lección completada ✅');
     }
-  }, [lessonId, isCompleted, completeLesson, addNotification]);
+  }, [lessonId, isCompleted, completeLesson, addNotification, isAdminPreview]);
 
   const copyToClipboard = async (code: string, id: string) => {
     try {
@@ -104,7 +110,7 @@ export default function Lesson() {
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400 mb-2">
           <button
-            onClick={() => navigate(`/modules/${mod.id}`)}
+            onClick={() => navigate(`/modules/${mod.id}${isAdminPreview ? '?adminPreview=true' : ''}`)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all cursor-pointer"
           >
             <ArrowLeft size={14} />
@@ -195,7 +201,7 @@ export default function Lesson() {
       </div>
 
       {/* Notes & Bookmarks */}
-      {lessonId && (
+      {!isAdminPreview && lessonId && (
         <div className="mt-8 pt-6 border-t border-stone-200 dark:border-stone-700">
           <NotesBookmarks lessonId={lessonId} />
         </div>
@@ -208,7 +214,7 @@ export default function Lesson() {
           <div className="flex items-center gap-3">
             {prevLesson ? (
               <button
-                onClick={() => navigate(`/modules/${mod.id}/lessons/${prevLesson.id}`)}
+                onClick={() => navigate(`/modules/${mod.id}/lessons/${prevLesson.id}${isAdminPreview ? '?adminPreview=true' : ''}`)}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-all cursor-pointer"
               >
                 <ChevronLeft size={16} />
@@ -220,7 +226,7 @@ export default function Lesson() {
 
             {nextLesson ? (
               <button
-                onClick={() => navigate(`/modules/${mod.id}/lessons/${nextLesson.id}`)}
+                onClick={() => navigate(`/modules/${mod.id}/lessons/${nextLesson.id}${isAdminPreview ? '?adminPreview=true' : ''}`)}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-all cursor-pointer"
               >
                 Siguiente
@@ -228,7 +234,7 @@ export default function Lesson() {
               </button>
             ) : allLessonsCompleted ? (
               <button
-                onClick={() => navigate(`/modules/${mod.id}/quiz`)}
+                onClick={() => navigate(`/modules/${mod.id}/quiz${isAdminPreview ? '?adminPreview=true' : ''}`)}
                 className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
                 <ClipboardCheck size={16} />
@@ -248,12 +254,14 @@ export default function Lesson() {
               ${
                 isCompleted
                   ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 cursor-default'
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg'
+                  : isAdminPreview
+                    ? 'bg-stone-200 dark:bg-stone-700 text-stone-500 dark:text-stone-400 cursor-default'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg'
               }
             `}
           >
             <CheckCircle2 size={16} />
-            {isCompleted ? 'Completada' : 'Marcar como Completada'}
+            {isCompleted ? 'Completada' : isAdminPreview ? 'Vista Previa' : 'Marcar como Completada'}
           </button>
         </div>
       </div>

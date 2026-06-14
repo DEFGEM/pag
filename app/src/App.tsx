@@ -57,6 +57,7 @@ function AppLayout() {
               <Route path="/admin/modules" element={<AdminModules />} />
               <Route path="/admin/exams" element={<AdminExams />} />
               <Route path="/admin/stats" element={<AdminStats />} />
+              <Route path="/admin/user/:userId" element={<UserProfile />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

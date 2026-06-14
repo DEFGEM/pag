@@ -79,13 +79,13 @@ function initializeState(): AppState {
     ? { ...defaultProgress, ...usersData[currentUserId].progress }
     : defaultProgress;
 
-  // Load current user's custom modules
-  const userCustomModules = currentUserId && usersData[currentUserId]?.customModules
-    ? usersData[currentUserId].customModules
-    : [];
+  // Load ALL users' custom modules into state.modules
+  const allUserCustomModules = Object.values(usersData).flatMap(
+    (u) => u.customModules || []
+  );
 
   return {
-    modules: [...modules, ...importedModules, ...userCustomModules],
+    modules: [...modules, ...importedModules, ...allUserCustomModules],
     userProgress: currentProgress,
     achievements,
     usersData,
@@ -119,7 +119,9 @@ type Action =
   | { type: 'DELETE_IMPORTED_MODULE'; moduleId: string }
   | { type: 'ADD_USER_MODULE'; module: Module }
   | { type: 'UPDATE_USER_MODULE'; moduleId: string; updates: Partial<Module> }
+  | { type: 'UPDATE_USER_MODULE_AS_ADMIN'; moduleId: string; ownerId: string; updates: Partial<Module> }
   | { type: 'DELETE_USER_MODULE'; moduleId: string }
+  | { type: 'DELETE_USER_MODULE_AS_ADMIN'; moduleId: string; ownerId: string }
   | { type: 'TOGGLE_ADMIN' }
   | { type: 'UPDATE_STUDY_TIME'; minutes: number }
   | { type: 'UNLOCK_ACHIEVEMENT'; achievementId: string }
@@ -260,6 +262,25 @@ function appReducer(state: AppState, action: Action): AppState {
         modules: updatedAll,
       };
     }
+    case 'UPDATE_USER_MODULE_AS_ADMIN': {
+      const ownerData = state.usersData[action.ownerId];
+      if (!ownerData) return state;
+      const updatedCustom = (ownerData.customModules || []).map((m) =>
+        m.id === action.moduleId ? { ...m, ...action.updates } : m
+      );
+      const updatedUsersData = {
+        ...state.usersData,
+        [action.ownerId]: { ...ownerData, customModules: updatedCustom },
+      };
+      const updatedAll = state.modules.map((m) =>
+        m.id === action.moduleId ? { ...m, ...action.updates } : m
+      );
+      return {
+        ...state,
+        usersData: updatedUsersData,
+        modules: updatedAll,
+      };
+    }
     case 'DELETE_USER_MODULE': {
       if (!state.currentUserId) return state;
       const userData = state.usersData[state.currentUserId];
@@ -273,6 +294,22 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         usersData: updatedUsersData,
         modules: [...modules, ...state.importedModules, ...updatedCustom],
+      };
+    }
+    case 'DELETE_USER_MODULE_AS_ADMIN': {
+      const ownerData = state.usersData[action.ownerId];
+      if (!ownerData) return state;
+      const updatedCustom = (ownerData.customModules || []).filter((m) => m.id !== action.moduleId);
+      const updatedUsersData = {
+        ...state.usersData,
+        [action.ownerId]: { ...ownerData, customModules: updatedCustom },
+      };
+      // Rebuild modules from all users
+      const allUserModules = Object.values(updatedUsersData).flatMap((u) => u.customModules || []);
+      return {
+        ...state,
+        usersData: updatedUsersData,
+        modules: [...modules, ...state.importedModules, ...allUserModules],
       };
     }
     case 'TOGGLE_ADMIN': {
@@ -297,12 +334,15 @@ function appReducer(state: AppState, action: Action): AppState {
     }
     case 'SET_USER': {
       const userData = state.usersData[action.userId];
-      const userCustom = userData?.customModules || [];
+      // Load ALL users' custom modules
+      const allCustom = Object.values(state.usersData).flatMap(
+        (u) => u.customModules || []
+      );
       return {
         ...state,
         currentUserId: action.userId,
         userProgress: userData ? { ...defaultProgress, ...userData.progress } : defaultProgress,
-        modules: [...modules, ...state.importedModules, ...userCustom],
+        modules: [...modules, ...state.importedModules, ...allCustom],
       };
     }
     case 'REGISTER_USER': {
@@ -336,12 +376,15 @@ function appReducer(state: AppState, action: Action): AppState {
       if (!userEntry) {
         return state;
       }
-      const loginUserCustom = userEntry.customModules || [];
+      // Load ALL users' custom modules
+      const allCustom = Object.values(state.usersData).flatMap(
+        (u) => u.customModules || []
+      );
       return {
         ...state,
         currentUserId: userEntry.user.id,
         userProgress: { ...defaultProgress, ...userEntry.progress },
-        modules: [...modules, ...state.importedModules, ...loginUserCustom],
+        modules: [...modules, ...state.importedModules, ...allCustom],
         isAdmin: userEntry.user.isAdmin || false,
       };
     }

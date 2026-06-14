@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
-import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, Trophy, ArrowLeft, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, Trophy, ArrowLeft, RotateCcw, Eye } from 'lucide-react';
 import gsap from 'gsap';
 
 export default function Quiz() {
   const { moduleId } = useParams<{ moduleId: string }>();
+  const [searchParams] = useSearchParams();
+  const isAdminPreview = searchParams.get('adminPreview') === 'true';
   const { state, completeQuiz, addNotification } = useStore();
   const navigate = useNavigate();
 
@@ -73,12 +75,14 @@ export default function Quiz() {
       const finalScore = Math.round((correct / totalQuestions) * 100);
       setScore(finalScore);
       setIsFinished(true);
-      completeQuiz(quiz!.id, finalScore);
+      if (!isAdminPreview) {
+        completeQuiz(quiz!.id, finalScore);
+      }
 
       if (finalScore >= quiz!.passingScore) {
-        addNotification('success', `¡Evaluación aprobada con ${finalScore}%! 🎉`);
+        addNotification('success', isAdminPreview ? `Vista previa: ${finalScore}%` : `¡Evaluación aprobada con ${finalScore}%! 🎉`);
       } else {
-        addNotification('info', `Obtuviste ${finalScore}%. Necesitas ${quiz!.passingScore}% para aprobar.`);
+        addNotification('info', isAdminPreview ? `Vista previa: ${finalScore}%` : `Obtuviste ${finalScore}%. Necesitas ${quiz!.passingScore}% para aprobar.`);
       }
     }
   }
@@ -239,6 +243,23 @@ export default function Quiz() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
+      {/* Admin Preview Banner */}
+      {isAdminPreview && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <Eye size={18} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Vista previa del admin</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400">Estás viendo la evaluación de un usuario. No se guardará el resultado.</p>
+          </div>
+          <button
+            onClick={() => navigate(-1)}
+            className="text-xs px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+          >
+            Volver
+          </button>
+        </div>
+      )}
+
       {/* Quiz Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">

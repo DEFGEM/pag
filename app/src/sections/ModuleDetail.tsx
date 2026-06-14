@@ -1,12 +1,14 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '@/hooks/useStore';
-import { Clock, CheckCircle2, Lock, ChevronRight, PlayCircle, ClipboardCheck } from 'lucide-react';
+import { Clock, CheckCircle2, Lock, ChevronRight, PlayCircle, ClipboardCheck, Eye } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { difficultyBadge } from '@/lib/utils';
 
 export default function ModuleDetail() {
   const { moduleId } = useParams<{ moduleId: string }>();
+  const [searchParams] = useSearchParams();
+  const isAdminPreview = searchParams.get('adminPreview') === 'true';
   const { state, getModuleProgress } = useStore();
   const navigate = useNavigate();
   const listRef = useRef<HTMLDivElement>(null);
@@ -38,14 +40,15 @@ export default function ModuleDetail() {
     );
   }
 
-  const progress = getModuleProgress(mod.id);
-  const completedLessonsCount = mod.lessons.filter((l) =>
+  const progress = isAdminPreview ? 0 : getModuleProgress(mod.id);
+  const completedLessonsCount = isAdminPreview ? 0 : mod.lessons.filter((l) =>
     userProgress.completedLessons.includes(l.id)
   ).length;
-  const allLessonsCompleted = completedLessonsCount === mod.lessons.length;
-  const quizDone = userProgress.completedQuizzes[mod.quiz.id];
+  const allLessonsCompleted = isAdminPreview ? true : completedLessonsCount === mod.lessons.length;
+  const quizDone = isAdminPreview ? false : userProgress.completedQuizzes[mod.quiz.id];
 
   const lessonStatus = (lessonId: string, index: number) => {
+    if (isAdminPreview) return { isCompleted: false, isFirstIncomplete: index === 0, isLocked: false };
     const isCompleted = userProgress.completedLessons.includes(lessonId);
     const isFirstIncomplete =
       !isCompleted &&
@@ -61,6 +64,23 @@ export default function ModuleDetail() {
 
   return (
     <div className="p-6 max-w-4xl">
+      {/* Admin Preview Banner */}
+      {isAdminPreview && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <Eye size={18} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Vista previa del admin</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400">Estás viendo el módulo de un usuario. No se guardará progreso.</p>
+          </div>
+          <button
+            onClick={() => navigate(-1)}
+            className="text-xs px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+          >
+            Volver
+          </button>
+        </div>
+      )}
+
       {/* Module Header */}
       <div className="relative rounded-2xl overflow-hidden mb-8">
         <img src={mod.thumbnail} alt={mod.title} className="w-full aspect-[21/9] object-cover" />
@@ -82,6 +102,7 @@ export default function ModuleDetail() {
       </div>
 
       {/* Progress Bar */}
+      {!isAdminPreview && (
       <div className="bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 p-4 mb-6">
         <div className="flex items-center justify-between text-sm mb-2">
           <span className="text-stone-600 dark:text-stone-400">Progreso del módulo</span>
@@ -96,6 +117,7 @@ export default function ModuleDetail() {
           />
         </div>
       </div>
+      )}
 
       {/* Lessons List */}
       <div ref={listRef} className="space-y-2">
@@ -107,7 +129,7 @@ export default function ModuleDetail() {
               key={lesson.id}
               onClick={() => {
                 if (!isLocked) {
-                  navigate(`/modules/${mod.id}/lessons/${lesson.id}`);
+                  navigate(`/modules/${mod.id}/lessons/${lesson.id}${isAdminPreview ? '?adminPreview=true' : ''}`);
                 }
               }}
               className={`
@@ -165,7 +187,15 @@ export default function ModuleDetail() {
 
       {/* Quiz Button */}
       <div className="mt-6">
-        {allLessonsCompleted ? (
+        {isAdminPreview ? (
+          <button
+            onClick={() => navigate(`/modules/${mod.id}/quiz?adminPreview=true`)}
+            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors cursor-pointer"
+          >
+            <ClipboardCheck size={20} />
+            Ver Evaluación
+          </button>
+        ) : allLessonsCompleted ? (
           quizDone ? (
             <div className="bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800/40 p-5 flex items-center gap-4">
               <CheckCircle2 size={24} className="text-teal-600 dark:text-teal-400" />
