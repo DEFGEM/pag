@@ -15,11 +15,11 @@ export default function NotesBookmarks({ lessonId }: NotesBookmarksProps) {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editContent, setEditContent] = useState('');
 
-  const isBookmarked = userProgress.bookmarks.includes(lessonId);
-  const lessonNotes = userProgress.notes.filter((n) => n.lessonId === lessonId);
+  const isBookmarked = (userProgress.bookmarks || []).includes(lessonId);
+  const lessonNotes = (userProgress.notes || []).filter((n) => n.lessonId === lessonId);
 
   // Get bookmarked lessons
-  const bookmarkedLessons = userProgress.bookmarks
+  const bookmarkedLessons = (userProgress.bookmarks || [])
     .map((bId) => {
       for (const mod of modules) {
         const lesson = mod.lessons.find((l) => l.id === bId);

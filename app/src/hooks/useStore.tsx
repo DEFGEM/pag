@@ -68,7 +68,7 @@ function initializeState(): AppState {
   }
 
   const currentProgress = currentUserId && usersData[currentUserId]
-    ? usersData[currentUserId].progress
+    ? { ...defaultProgress, ...usersData[currentUserId].progress }
     : defaultProgress;
 
   return {
